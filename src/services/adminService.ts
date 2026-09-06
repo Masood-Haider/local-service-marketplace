@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore"
 import { db } from "@/firebase/config"
 import { BookingStatus, Booking, Job } from "@/services/jobService"
+import { createNotification } from "@/services/notificationService"
 
 export interface AdminUser {
   uid: string
@@ -273,10 +274,44 @@ export async function adminOverrideBookingStatus(
   newStatus: BookingStatus
 ): Promise<void> {
   const bookingRef = doc(db, "bookings", bookingId)
+
+  // Fetch booking details prior to override
+  let bookingData: Booking | null = null
+  try {
+    const snap = await getDoc(bookingRef)
+    if (snap.exists()) {
+      bookingData = snap.data() as Booking
+    }
+  } catch (err) {
+    console.warn("Could not retrieve booking doc for admin override notification:", err)
+  }
+
   await updateDoc(bookingRef, {
     status: newStatus,
     adminOverrideAt: serverTimestamp(),
   })
+
+  // Dispatch notifications to customer and provider
+  if (bookingData) {
+    const statusLabel = newStatus.replace("_", " ").toUpperCase()
+    const title = bookingData.jobTitle || "Service"
+
+    try {
+      await createNotification({
+        userId: bookingData.customerId,
+        message: `Admin updated your booking for "${title}" to ${statusLabel}.`,
+        type: "booking_status",
+      })
+
+      await createNotification({
+        userId: bookingData.providerId,
+        message: `Admin updated booking for "${title}" to ${statusLabel}.`,
+        type: "booking_status",
+      })
+    } catch (nErr) {
+      console.warn("Failed to notify on admin booking override:", nErr)
+    }
+  }
 }
 
 /**

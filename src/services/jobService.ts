@@ -14,6 +14,7 @@ import {
   Unsubscribe,
 } from "firebase/firestore"
 import { db } from "@/firebase/config"
+import { createNotification } from "@/services/notificationService"
 
 export interface Job {
   id: string
@@ -233,6 +234,22 @@ export async function submitJobQuote(
     status: "pending",
     createdAt: serverTimestamp(),
   })
+
+  // Notify the job's customer that a provider submitted a quote
+  try {
+    const jobSnap = await getDoc(doc(db, "jobs", jobId))
+    if (jobSnap.exists()) {
+      const jData = jobSnap.data() as Job
+      await createNotification({
+        userId: jData.customerId,
+        message: `${quoteData.providerName} submitted a quote (${quoteData.price}) for "${jData.title}".`,
+        type: "quote_request",
+      })
+    }
+  } catch (err) {
+    console.warn("Failed to notify customer of new quote:", err)
+  }
+
   return docRef.id
 }
 
@@ -289,6 +306,26 @@ export async function acceptJobQuoteWithSlot(
   })
 
   await batch.commit()
+
+  // Real-time notifications: trigger for provider whose quote was accepted & customer
+  try {
+    // Notify provider that their quote was accepted
+    await createNotification({
+      userId: quote.providerId,
+      message: `Your quote (${quote.price}) for "${job.title}" has been accepted! Booking confirmed for ${slot.scheduledDate}.`,
+      type: "quote_accepted",
+    })
+
+    // Also notify customer of confirmed booking
+    await createNotification({
+      userId: job.customerId,
+      message: `Quote from ${quote.providerName} for "${job.title}" was accepted. Booking confirmed.`,
+      type: "quote_accepted",
+    })
+  } catch (err) {
+    console.warn("Failed to notify participants on quote acceptance:", err)
+  }
+
   return newBookingRef.id
 }
 
@@ -304,16 +341,53 @@ export async function acceptJobQuote(job: Job, quote: JobQuote): Promise<string>
 
 /**
  * Updates a booking's status in Firestore (e.g. pending -> confirmed -> in_progress -> completed -> cancelled)
+ * and dispatches real-time in-app notifications to participants.
  */
 export async function updateBookingStatus(
   bookingId: string,
   newStatus: BookingStatus
 ): Promise<void> {
   const bookingRef = doc(db, "bookings", bookingId)
+
+  // Fetch booking details prior to updating to inform participants
+  let bookingData: Booking | null = null
+  try {
+    const snap = await getDoc(bookingRef)
+    if (snap.exists()) {
+      bookingData = { id: snap.id, ...(snap.data() as any) }
+    }
+  } catch (e) {
+    console.warn("Could not retrieve booking for status notification:", e)
+  }
+
   await updateDoc(bookingRef, {
     status: newStatus,
     updatedAt: serverTimestamp(),
   })
+
+  // Trigger real-time notifications for both participants
+  if (bookingData) {
+    const statusLabel = newStatus.replace("_", " ").toUpperCase()
+    const jobTitle = bookingData.jobTitle || "Service"
+
+    try {
+      // Notify customer
+      await createNotification({
+        userId: bookingData.customerId,
+        message: `Booking for "${jobTitle}" status changed to ${statusLabel}.`,
+        type: "booking_status",
+      })
+
+      // Notify provider
+      await createNotification({
+        userId: bookingData.providerId,
+        message: `Booking for "${jobTitle}" status changed to ${statusLabel}.`,
+        type: "booking_status",
+      })
+    } catch (nErr) {
+      console.warn("Failed to trigger booking status notification:", nErr)
+    }
+  }
 }
 
 /**

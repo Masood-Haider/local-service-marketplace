@@ -35,6 +35,7 @@ import {
   Calendar,
   Settings,
 } from "lucide-react"
+import { NotificationBell } from "@/components/notifications/NotificationBell"
 
 export const Navbar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -111,7 +112,9 @@ export const Navbar: React.FC = () => {
           </Link>
 
           {currentUser ? (
-            <DropdownMenu>
+            <>
+              <NotificationBell />
+              <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
@@ -193,6 +196,7 @@ export const Navbar: React.FC = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            </>
           ) : (
             <div className="flex items-center gap-1.5">
               <Link to="/login">
@@ -209,8 +213,9 @@ export const Navbar: React.FC = () => {
           )}
         </div>
 
-        {/* Mobile Hamburger Sheet */}
-        <div className="md:hidden">
+        {/* Mobile Header: Notifications & Hamburger Sheet */}
+        <div className="md:hidden flex items-center gap-1.5">
+          {currentUser && <NotificationBell />}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Open menu">

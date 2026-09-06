@@ -1,0 +1,311 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================================
+    // HELPER FUNCTIONS
+    // ============================================================================
+
+    // Checks if the user is authenticated with Firebase Auth
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Checks if the authenticated user matches the given userId
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Checks if the requesting user is an admin via Custom Auth Claims OR Firestore role
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    // Checks if the requesting user is a registered provider
+    function isProvider() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'provider' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'provider') ||
+        exists(/databases/$(database)/documents/providers/$(request.auth.uid))
+      );
+    }
+
+    // ============================================================================
+    // USERS COLLECTION
+    // Rule: Users can only edit their own profile; only admins can delete users or set admin role.
+    // ============================================================================
+    match /users/{userId} {
+      // Authenticated users can view user profiles (e.g. name, avatar, role)
+      allow read: if isAuthenticated();
+
+      // Users can only create their own user document and cannot grant themselves admin status
+      allow create: if isOwner(userId) && (
+        !request.resource.data.keys().hasAny(['role']) ||
+        request.resource.data.role != 'admin' ||
+        isAdmin()
+      );
+
+      // Users can only edit their own profile; cannot self-elevate role to 'admin' or toggle 'disabled'
+      allow update: if (
+        isOwner(userId) &&
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'disabled']) || isAdmin())
+      ) || isAdmin();
+
+      // Only admins can delete user records
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================================
+    // PROVIDERS COLLECTION
+    // Rule: Providers can edit their profile, but only admins can approve/verify providers.
+    // ============================================================================
+    match /providers/{providerId} {
+      // Public read so marketplace visitors can browse service specialists
+      allow read: if true;
+
+      // Provider creates their initial profile (verificationStatus defaults to pending or omitted)
+      allow create: if isOwner(providerId) && (
+        !('verificationStatus' in request.resource.data) ||
+        request.resource.data.verificationStatus == 'pending' ||
+        isAdmin()
+      );
+
+      // Provider edits their own profile (bio, price, portfolio) but CANNOT change verificationStatus or reviews
+      // Only admins can approve or change verificationStatus
+      // System atomic review transaction can update aggregate avgRating & totalReviews
+      allow update: if isAdmin() || (
+        isOwner(providerId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['verificationStatus', 'avgRating', 'totalReviews'])
+      ) || (
+        isAuthenticated() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['avgRating', 'totalReviews', 'updatedAt'])
+      );
+
+      // Provider can delete their profile, or admin can remove it
+      allow delete: if isOwner(providerId) || isAdmin();
+    }
+
+    // ============================================================================
+    // JOBS COLLECTION & QUOTES SUBCOLLECTION
+    // Rule: Only the job's customer can post/edit that job.
+    // Subcollection: Only providers can create quotes on open jobs; only job's customer can accept a quote.
+    // ============================================================================
+    match /jobs/{jobId} {
+      // Authenticated users can view jobs (providers browse open jobs; customers track theirs)
+      allow read: if isAuthenticated();
+
+      // Only the authenticated customer can post their own job with initial 'open' status
+      allow create: if isAuthenticated() &&
+        request.resource.data.customerId == request.auth.uid &&
+        request.resource.data.status == 'open';
+
+      // Only the customer who posted the job (or an admin) can edit the job details or cancel/book it
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        resource.data.customerId == request.auth.uid &&
+        request.resource.data.customerId == resource.data.customerId
+      );
+
+      // Only the job creator or an admin can delete the job
+      allow delete: if isAdmin() || (
+        isAuthenticated() && resource.data.customerId == request.auth.uid
+      );
+
+      // --------------------------------------------------------------------------
+      // QUOTES SUBCOLLECTION: jobs/{jobId}/quotes/{quoteId}
+      // --------------------------------------------------------------------------
+      match /quotes/{quoteId} {
+        // Only the customer who owns the job, the quoting provider, or an admin can view quotes
+        allow read: if isAuthenticated() && (
+          get(/databases/$(database)/documents/jobs/$(jobId)).data.customerId == request.auth.uid ||
+          resource.data.providerId == request.auth.uid ||
+          isAdmin()
+        );
+
+        // Only verified/registered providers can create quotes, and only if the parent job is still 'open'
+        allow create: if isProvider() &&
+          request.resource.data.providerId == request.auth.uid &&
+          request.resource.data.status == 'pending' &&
+          get(/databases/$(database)/documents/jobs/$(jobId)).data.status == 'open';
+
+        // Only the job's customer can accept/decline a quote (status modification)
+        // Quoting provider can edit quote pricing/message while it is still 'pending'
+        allow update: if isAdmin() || (
+          // Customer accepts or declines the quote
+          get(/databases/$(database)/documents/jobs/$(jobId)).data.customerId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+          request.resource.data.status in ['accepted', 'declined']
+        ) || (
+          // Provider amends price or message on their own pending quote
+          resource.data.providerId == request.auth.uid &&
+          resource.data.status == 'pending' &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'jobId', 'providerId'])
+        );
+
+        // Only the quote provider (while pending) or admin can delete the quote
+        allow delete: if isAdmin() || (
+          resource.data.providerId == request.auth.uid &&
+          resource.data.status == 'pending'
+        );
+      }
+    }
+
+    // ============================================================================
+    // BOOKINGS COLLECTION
+    // Rules:
+    // - Only participants (customer/provider) can update booking status appropriately.
+    // - Only admins can override booking status arbitrarily or delete bookings.
+    // ============================================================================
+    match /bookings/{bookingId} {
+      // Only the booking customer, assigned provider, or admin can read booking details
+      allow read: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.providerId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Created when customer accepts a quote or schedules service
+      allow create: if isAuthenticated() && (
+        request.resource.data.customerId == request.auth.uid || isAdmin()
+      ) && request.resource.data.status in ['pending', 'confirmed'];
+
+      // Status updates enforced by participant role & workflow:
+      // - Customer: can cancel pending/confirmed booking, or submit review attributes on completed booking
+      // - Provider: can step status: pending -> confirmed -> in_progress -> completed (or cancelled)
+      // - Admin: can override any booking status
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        // Must be a participant
+        (resource.data.customerId == request.auth.uid || resource.data.providerId == request.auth.uid) &&
+        // Core contractual data cannot be mutated
+        request.resource.data.customerId == resource.data.customerId &&
+        request.resource.data.providerId == resource.data.providerId &&
+        request.resource.data.jobId == resource.data.jobId &&
+        request.resource.data.price == resource.data.price &&
+        (
+          // Case 1: Customer cancels an unstarted booking
+          (
+            request.auth.uid == resource.data.customerId &&
+            resource.data.status in ['pending', 'confirmed'] &&
+            request.resource.data.status == 'cancelled' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          ) ||
+          // Case 2: Provider updates operational status sequentially
+          (
+            request.auth.uid == resource.data.providerId &&
+            (
+              (resource.data.status == 'pending' && request.resource.data.status in ['confirmed', 'cancelled']) ||
+              (resource.data.status == 'confirmed' && request.resource.data.status in ['in_progress', 'cancelled']) ||
+              (resource.data.status == 'in_progress' && request.resource.data.status == 'completed')
+            ) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          ) ||
+          // Case 3: Customer marks booking as reviewed upon review submission
+          (
+            request.auth.uid == resource.data.customerId &&
+            resource.data.status == 'completed' &&
+            resource.data.hasReviewed != true &&
+            request.resource.data.hasReviewed == true &&
+            request.resource.data.status == resource.data.status &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hasReviewed', 'rating', 'reviewComment', 'reviewedAt', 'updatedAt'])
+          )
+        )
+      );
+
+      // Only admins can delete booking history records
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================================
+    // REVIEWS COLLECTION
+    // Rule: Reviews can only be created by the customer on their own completed booking, once.
+    // ============================================================================
+    match /reviews/{reviewId} {
+      // Reviews are publicly readable so prospective customers see real feedback
+      allow read: if true;
+
+      // Customer creates review ONLY on their own COMPLETED booking, exactly once
+      allow create: if isAuthenticated() &&
+        // 1. Author must be current user
+        request.resource.data.customerId == request.auth.uid &&
+        // 2. Booking must exist
+        exists(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)) &&
+        // 3. Current user must be the customer of this booking
+        get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.customerId == request.auth.uid &&
+        // 4. Booking must have status 'completed'
+        get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.status == 'completed' &&
+        // 5. Booking must not have been reviewed before (enforces review once)
+        get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.hasReviewed != true &&
+        // 6. Review providerId must match booking's assigned provider
+        request.resource.data.providerId == get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.providerId &&
+        // 7. Rating must be between 1 and 5
+        request.resource.data.rating >= 1 && request.resource.data.rating <= 5 &&
+        // 8. Comment must be present
+        request.resource.data.comment is string &&
+        request.resource.data.comment.size() > 0;
+
+      // Customer can edit comment/rating of their own review, or admin can moderate
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        resource.data.customerId == request.auth.uid &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['bookingId', 'jobId', 'providerId', 'customerId'])
+      );
+
+      // Only the author customer or admin can remove a review
+      allow delete: if isAdmin() || (
+        isAuthenticated() && resource.data.customerId == request.auth.uid
+      );
+    }
+
+    // ============================================================================
+    // PLATFORM SETTINGS & LEGACY QUOTES
+    // ============================================================================
+    match /platform_settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /quotes/{quoteId} {
+      allow read: if isAuthenticated() && (
+        resource.data.customerEmail == request.auth.token.email ||
+        resource.data.providerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin() || (
+        isAuthenticated() && resource.data.providerId == request.auth.uid
+      );
+    }
+    // ============================================================================
+    // NOTIFICATIONS COLLECTION
+    // Fields: userId, message, type, read, createdAt
+    // ============================================================================
+    match /notifications/{notificationId} {
+      // Users can only read their own notifications
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+
+      // Authenticated users can create notifications (e.g. quote request, accepted quote, booking updates)
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId is string &&
+        request.resource.data.message is string &&
+        request.resource.data.type in ['quote_request', 'quote_accepted', 'booking_status', 'general'] &&
+        request.resource.data.read == false;
+
+      // Users can mark their own notifications as read
+      allow update: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+
+      // Users can delete their own notifications, or admin can delete
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+  }
+}

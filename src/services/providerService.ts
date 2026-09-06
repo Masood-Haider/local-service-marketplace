@@ -17,6 +17,7 @@ import {
   getDownloadURL,
 } from "firebase/storage"
 import { db, storage } from "@/firebase/config"
+import { createNotification } from "@/services/notificationService"
 
 export interface ProviderProfile {
   uid: string
@@ -264,5 +265,17 @@ export async function submitQuoteRequest(quote: Omit<QuoteRequest, "createdAt" |
     status: "pending",
     createdAt: serverTimestamp(),
   })
+
+  // Notify the recipient provider in real-time
+  try {
+    await createNotification({
+      userId: quote.providerId,
+      message: `New quote request from ${quote.customerName} for ${quote.serviceNeeded}.`,
+      type: "quote_request",
+    })
+  } catch (notifErr) {
+    console.warn("Failed to trigger quote request notification:", notifErr)
+  }
+
   return docRef.id
 }

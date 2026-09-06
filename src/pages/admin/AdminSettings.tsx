@@ -10,20 +10,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
-  Settings,
-  Shield,
   DollarSign,
   Mail,
-  Phone,
   Power,
   Save,
   Loader2,
   Server,
-  Lock,
   Sparkles,
+  Database,
 } from "lucide-react"
+import { seedMarketplaceData } from "@/services/seedService"
 
 export const AdminSettings: React.FC = () => {
   const { currentUser } = useAuth()
@@ -62,6 +60,26 @@ export const AdminSettings: React.FC = () => {
       toast.error("Failed to save settings", { description: err.message })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const [seeding, setSeeding] = useState(false)
+  const [seedProgress, setSeedProgress] = useState("")
+
+  const handleSeedDatabase = async () => {
+    setSeeding(true)
+    setSeedProgress("Initializing database seeding...")
+    try {
+      const stats = await seedMarketplaceData((msg) => setSeedProgress(msg))
+      toast.success("Demo database populated successfully!", {
+        description: `Created ${stats.providersCount} providers, ${stats.jobsCount} jobs, ${stats.bookingsCount} bookings, and ${stats.reviewsCount} reviews.`,
+      })
+      setSeedProgress("Database seeded successfully!")
+    } catch (err: any) {
+      toast.error("Failed to seed database", { description: err.message })
+      setSeedProgress("")
+    } finally {
+      setSeeding(false)
     }
   }
 
@@ -195,7 +213,54 @@ export const AdminSettings: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* 4. Platform System & Maintenance Mode */}
+        {/* 4. Demo Data Seeder */}
+        <Card className="bg-slate-900 border-slate-800 text-slate-100">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Database className="w-5 h-5 text-amber-400" />
+              <CardTitle className="text-base text-white">Demo Data Seeder</CardTitle>
+            </div>
+            <CardDescription className="text-xs text-slate-400">
+              Populate Firestore with 12+ realistic service providers across all categories, sample jobs, bookings, and customer reviews.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-slate-950 border border-slate-800 gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-white">Realistic Marketplace Mock Data</p>
+                <p className="text-xs text-slate-400 max-w-lg">
+                  Instantly sets up providers for Plumbing, Electrical, Cleaning, Tutoring, Moving, HVAC, Carpentry, Painting, Handyman, Landscaping, Roofing, and Pest Control with portfolios, ratings, and quotes.
+                </p>
+                {seedProgress && (
+                  <p className="text-xs font-semibold text-amber-400 flex items-center gap-1.5 pt-1">
+                    <Sparkles className="w-3.5 h-3.5 animate-pulse" /> {seedProgress}
+                  </p>
+                )}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleSeedDatabase}
+                disabled={seeding}
+                className="gap-2 text-xs font-bold shrink-0 bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 hover:text-white h-9 px-4"
+              >
+                {seeding ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Seeding Database...
+                  </>
+                ) : (
+                  <>
+                    <Database className="w-3.5 h-3.5 text-amber-400" /> Seed Sample Demo Data
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 5. Platform System & Maintenance Mode */}
         <Card className="bg-slate-900 border-slate-800 text-slate-100">
           <CardHeader>
             <div className="flex items-center gap-2">

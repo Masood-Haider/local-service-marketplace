@@ -1,0 +1,85 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ============================================================================
+    // HELPER FUNCTIONS
+    // ============================================================================
+
+    // Checks if the user is authenticated with Firebase Auth
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Checks if the user is an admin via Custom Claims
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.admin == true;
+    }
+
+    // Validates that the uploaded file is an image under maxSizeBytes
+    function isImageBelow(maxSizeBytes) {
+      return request.resource.size < maxSizeBytes &&
+             request.resource.contentType.matches('image/.*');
+    }
+
+    // Validates that the uploaded file is an image or PDF document under maxSizeBytes
+    function isImageOrPdfBelow(maxSizeBytes) {
+      return request.resource.size < maxSizeBytes &&
+             (request.resource.contentType.matches('image/.*') ||
+              request.resource.contentType == 'application/pdf');
+    }
+
+    // ============================================================================
+    // USER ASSETS: users/{userId}/{fileName}
+    // Profile avatars and personal customer documents
+    // ============================================================================
+    match /users/{userId}/{fileName} {
+      // Profile pictures can be viewed by anyone to render UI avatars
+      allow read: if true;
+
+      // Only the account owner or admin can upload or delete their profile picture (max 5MB image)
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin()) &&
+                   isImageBelow(5 * 1024 * 1024);
+
+      allow delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // ============================================================================
+    // PROVIDER ASSETS: providers/{providerId}/{fileName}
+    // Portfolio images, trade licenses, certifications, and hero photos
+    // ============================================================================
+    match /providers/{providerId}/{fileName} {
+      // Portfolio images and public credentials can be viewed by prospective customers
+      allow read: if true;
+
+      // Only the provider or admin can upload portfolio images or verification docs (max 10MB image or PDF)
+      allow write: if isAuthenticated() && (request.auth.uid == providerId || isAdmin()) &&
+                   isImageOrPdfBelow(10 * 1024 * 1024);
+
+      allow delete: if isAuthenticated() && (request.auth.uid == providerId || isAdmin());
+    }
+
+    // ============================================================================
+    // JOB ATTACHMENTS: jobs/{jobId}/{fileName}
+    // Photos or scope attachments uploaded by customers describing the job
+    // ============================================================================
+    match /jobs/{jobId}/{fileName} {
+      // Logged in users (customers & bidding providers) can inspect job attachments
+      allow read: if isAuthenticated();
+
+      // Logged in users can upload job images under 10MB
+      allow write: if isAuthenticated() && isImageBelow(10 * 1024 * 1024);
+
+      // Only authenticated users or admin can delete
+      allow delete: if isAuthenticated();
+    }
+
+    // ============================================================================
+    // DEFAULT CATCH-ALL
+    // Reject any file operations outside designated business directories
+    // ============================================================================
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
