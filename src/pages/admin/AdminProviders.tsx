@@ -119,25 +119,25 @@ export const AdminProviders: React.FC = () => {
     switch (status) {
       case "approved":
         return (
-          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 gap-1 text-[11px]">
+          <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1 text-[11px]">
             <CheckCircle2 className="w-3 h-3" /> Approved & Verified
           </Badge>
         )
       case "pending":
         return (
-          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 gap-1 text-[11px]">
+          <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1 text-[11px]">
             <Clock className="w-3 h-3" /> Verification Pending
           </Badge>
         )
       case "rejected":
         return (
-          <Badge className="bg-rose-500/20 text-rose-400 border-rose-500/30 gap-1 text-[11px]">
+          <Badge className="bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30 gap-1 text-[11px]">
             <XCircle className="w-3 h-3" /> Application Declined
           </Badge>
         )
       default:
         return (
-          <Badge className="bg-slate-800 text-slate-300 text-[11px]">
+          <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px]">
             {status || "Active"}
           </Badge>
         )
@@ -149,10 +149,10 @@ export const AdminProviders: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
             Trade Providers & Verifications
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Review licenses, approve onboarding applications, and monitor service provider ratings.
           </p>
         </div>
@@ -161,31 +161,31 @@ export const AdminProviders: React.FC = () => {
           onClick={loadProviders}
           variant="outline"
           size="sm"
-          className="gap-2 text-xs bg-slate-900 border-slate-800 text-slate-300 hover:text-white shrink-0"
+          className="gap-2 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0"
         >
           <RefreshCw className="w-3.5 h-3.5" /> Refresh Providers
         </Button>
       </div>
 
       {/* Filter and Search Bar */}
-      <Card className="bg-slate-900 border-slate-800 p-4">
+      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xs p-4">
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
+            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400 dark:text-slate-500" />
             <Input
               placeholder="Search provider by business name, trade, or territory..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 h-10 bg-slate-950 border-slate-800 text-slate-200 text-xs"
+              className="pl-9 h-10 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-200 text-xs"
             />
           </div>
 
           <div className="w-full sm:w-48">
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="h-10 bg-slate-950 border-slate-800 text-slate-200 text-xs">
+              <SelectTrigger className="h-10 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-200 text-xs">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
-              <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
+              <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-200">
                 {categories.map((c) => (
                   <SelectItem key={c} value={c}>
                     {c === "All" ? "All Categories" : c}
@@ -197,10 +197,10 @@ export const AdminProviders: React.FC = () => {
 
           <div className="w-full sm:w-44">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-10 bg-slate-950 border-slate-800 text-slate-200 text-xs">
+              <SelectTrigger className="h-10 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-200 text-xs">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
-              <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
+              <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-200">
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
@@ -212,11 +212,11 @@ export const AdminProviders: React.FC = () => {
       </Card>
 
       {/* Providers Table */}
-      <Card className="bg-slate-900 border-slate-800 text-slate-100 overflow-hidden">
-        <CardHeader className="pb-3">
+      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 shadow-xs overflow-hidden">
+        <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-bold text-white">Registered Providers</CardTitle>
-            <Badge variant="outline" className="text-xs text-slate-400 border-slate-700">
+            <CardTitle className="text-base font-bold text-slate-900 dark:text-white">Registered Providers</CardTitle>
+            <Badge variant="outline" className="text-xs text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700">
               Showing {filteredProviders.length} of {providers.length} Pros
             </Badge>
           </div>
@@ -225,38 +225,38 @@ export const AdminProviders: React.FC = () => {
           {loading ? (
             <div className="py-20 flex flex-col items-center justify-center space-y-2">
               <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
-              <p className="text-xs text-slate-400">Loading service providers...</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Loading service providers...</p>
             </div>
           ) : filteredProviders.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="bg-slate-950/60 border-slate-800">
-                  <TableRow className="border-slate-800 hover:bg-transparent">
-                    <TableHead className="text-slate-400">Provider</TableHead>
-                    <TableHead className="text-slate-400">Category & Rates</TableHead>
-                    <TableHead className="text-slate-400">Territory</TableHead>
-                    <TableHead className="text-slate-400">Rating & Reviews</TableHead>
-                    <TableHead className="text-slate-400">Verification Status</TableHead>
-                    <TableHead className="text-right text-slate-400">Approval Actions</TableHead>
+                <TableHeader className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800">
+                  <TableRow className="border-slate-200 dark:border-slate-800 hover:bg-transparent">
+                    <TableHead className="text-slate-600 dark:text-slate-400 font-semibold">Provider</TableHead>
+                    <TableHead className="text-slate-600 dark:text-slate-400 font-semibold">Category & Rates</TableHead>
+                    <TableHead className="text-slate-600 dark:text-slate-400 font-semibold">Territory</TableHead>
+                    <TableHead className="text-slate-600 dark:text-slate-400 font-semibold">Rating & Reviews</TableHead>
+                    <TableHead className="text-slate-600 dark:text-slate-400 font-semibold">Verification Status</TableHead>
+                    <TableHead className="text-right text-slate-600 dark:text-slate-400 font-semibold">Approval Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredProviders.map((provider) => (
-                    <TableRow key={provider.uid} className="border-slate-800/80 hover:bg-slate-800/40">
+                    <TableRow key={provider.uid} className="border-slate-200 dark:border-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800/40">
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9 border border-slate-700">
+                          <Avatar className="h-9 w-9 border border-slate-200 dark:border-slate-700">
                             <AvatarImage src={provider.photoURL} alt={provider.name} />
-                            <AvatarFallback className="bg-slate-800 text-slate-300 font-bold text-xs">
+                            <AvatarFallback className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs">
                               {provider.name?.[0]?.toUpperCase() || "P"}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="font-bold text-xs text-white">{provider.name}</p>
+                            <p className="font-bold text-xs text-slate-900 dark:text-white">{provider.name}</p>
                             <Link
                               to={`/providers/${provider.uid}`}
                               target="_blank"
-                              className="text-[11px] text-amber-400 hover:underline flex items-center gap-1"
+                              className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1"
                             >
                               Public Profile <ExternalLink className="w-3 h-3" />
                             </Link>
@@ -269,11 +269,11 @@ export const AdminProviders: React.FC = () => {
                           <Badge variant="outline" className="text-[10px] text-primary border-primary/30">
                             {provider.category}
                           </Badge>
-                          <p className="text-xs font-semibold text-slate-300 mt-1">{provider.priceRange}</p>
+                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-1">{provider.priceRange}</p>
                         </div>
                       </TableCell>
 
-                      <TableCell className="text-xs text-slate-300">
+                      <TableCell className="text-xs text-slate-700 dark:text-slate-300">
                         <span className="flex items-center gap-1">
                           <MapPin className="w-3 h-3 text-primary shrink-0" />
                           <span className="truncate max-w-[150px]">{provider.serviceArea}</span>
@@ -282,10 +282,10 @@ export const AdminProviders: React.FC = () => {
 
                       <TableCell>
                         <div className="flex items-center gap-1.5 text-xs">
-                          <span className="flex items-center gap-1 text-amber-400 font-bold">
+                          <span className="flex items-center gap-1 text-amber-500 font-bold">
                             <Star className="w-3.5 h-3.5 fill-current" /> {provider.avgRating || "5.0"}
                           </span>
-                          <span className="text-slate-500">({provider.totalReviews || 0})</span>
+                          <span className="text-slate-400 dark:text-slate-500">({provider.totalReviews || 0})</span>
                         </div>
                       </TableCell>
 
@@ -312,7 +312,7 @@ export const AdminProviders: React.FC = () => {
                             updatingUid === provider.uid ||
                             provider.verificationStatus === "rejected"
                           }
-                          className="h-7 px-2 text-[11px] text-rose-400 border-rose-900/50 hover:bg-rose-950/40"
+                          className="h-7 px-2 text-[11px] text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/40"
                         >
                           <XCircle className="w-3 h-3 mr-1" /> Reject
                         </Button>
