@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
 import {
   AppNotification,
@@ -56,7 +57,8 @@ function formatRelativeTime(timestamp: any): string {
 }
 
 export const NotificationBell: React.FC<{ className?: string }> = ({ className }) => {
-  const { currentUser } = useAuth()
+  const { currentUser, role } = useAuth()
+  const navigate = useNavigate()
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [isMarkingAll, setIsMarkingAll] = useState(false)
@@ -91,7 +93,19 @@ export const NotificationBell: React.FC<{ className?: string }> = ({ className }
     }
   }
 
+  const navigateToDashboard = () => {
+    setIsOpen(false)
+    if (role === "provider" || currentUser?.role === "provider") {
+      navigate("/dashboard/provider")
+    } else if (role === "admin" || currentUser?.role === "admin") {
+      navigate("/dashboard/admin")
+    } else {
+      navigate("/dashboard/customer")
+    }
+  }
+
   const handleItemClick = async (notif: AppNotification) => {
+    setIsOpen(false)
     if (!notif.read) {
       try {
         await markNotificationAsRead(notif.id)
@@ -99,6 +113,7 @@ export const NotificationBell: React.FC<{ className?: string }> = ({ className }
         console.error("Failed to mark notification as read:", err)
       }
     }
+    navigateToDashboard()
   }
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -227,13 +242,16 @@ export const NotificationBell: React.FC<{ className?: string }> = ({ className }
         </div>
 
         {/* Footer */}
-        {notifications.length > 0 && (
-          <div className="px-4 py-2 bg-muted/20 border-t border-border/60 text-center">
-            <span className="text-[11px] text-muted-foreground">
-              Real-time updates enabled
-            </span>
-          </div>
-        )}
+        <div className="p-2 bg-muted/20 border-t border-border/60 text-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full text-xs text-primary hover:text-primary/90 hover:bg-primary/10 font-semibold h-8 gap-1.5 justify-center"
+            onClick={navigateToDashboard}
+          >
+            Go to {role === "provider" || currentUser?.role === "provider" ? "Pro" : role === "admin" || currentUser?.role === "admin" ? "Admin" : "Customer"} Dashboard →
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
   )
