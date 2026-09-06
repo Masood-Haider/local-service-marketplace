@@ -1,8 +1,10 @@
 import React from "react"
 import { Link } from "react-router-dom"
-import { Wrench, ShieldCheck, Heart } from "lucide-react"
+import { Wrench, ShieldCheck } from "lucide-react"
+import { useAuth } from "@/context/AuthContext"
 
 export const Footer: React.FC = () => {
+  const { role } = useAuth()
   const popularCategories = [
     { name: "Plumbing", href: "/providers?category=Plumbing" },
     { name: "Electrical", href: "/providers?category=Electrical" },
@@ -58,26 +60,36 @@ export const Footer: React.FC = () => {
                   Find a Local Pro
                 </Link>
               </li>
-              <li>
-                <Link to="/post-job" className="hover:text-primary transition-colors">
-                  Post a Job Request
-                </Link>
-              </li>
-              <li>
-                <Link to="/register" className="hover:text-primary transition-colors">
-                  Join as a Pro
-                </Link>
-              </li>
-              <li>
-                <Link to="/dashboard/customer" className="hover:text-primary transition-colors">
-                  Customer Portal
-                </Link>
-              </li>
-              <li>
-                <Link to="/dashboard/provider" className="hover:text-primary transition-colors">
-                  Provider Hub
-                </Link>
-              </li>
+              {role !== "provider" && (
+                <>
+                  <li>
+                    <Link to="/post-job" className="hover:text-primary transition-colors">
+                      Post a Job Request
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/register" className="hover:text-primary transition-colors">
+                      Join as a Pro
+                    </Link>
+                  </li>
+                </>
+              )}
+              {/* Only show Customer Dashboard if user is a customer */}
+              {role === "customer" && (
+                <li>
+                  <Link to="/dashboard/customer" className="hover:text-primary transition-colors">
+                    Customer Dashboard
+                  </Link>
+                </li>
+              )}
+              {/* Only show Provider Hub if user is a provider */}
+              {role === "provider" && (
+                <li>
+                  <Link to="/dashboard/provider" className="hover:text-primary transition-colors">
+                    Provider Hub
+                  </Link>
+                </li>
+              )}
             </ul>
           </div>
 
