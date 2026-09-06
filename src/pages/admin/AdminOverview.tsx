@@ -269,7 +269,6 @@ export const AdminOverview: React.FC = () => {
                 paddingAngle={4}
                 dataKey="value"
                 nameKey="name"
-                label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
               >
                 {metrics.bookingStatusBreakdown.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
