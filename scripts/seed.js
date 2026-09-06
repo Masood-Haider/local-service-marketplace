@@ -2,13 +2,37 @@
 import { initializeApp } from "firebase/app"
 import { getFirestore, doc, setDoc, serverTimestamp } from "firebase/firestore"
 
+import fs from "fs"
+import path from "path"
+import { fileURLToPath } from "url"
+
+// Automatically load variables from .env if available
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const envPath = path.resolve(__dirname, "../.env")
+if (fs.existsSync(envPath)) {
+  const content = fs.readFileSync(envPath, "utf-8")
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim()
+    if (trimmed && !trimmed.startsWith("#")) {
+      const idx = trimmed.indexOf("=")
+      if (idx !== -1) {
+        const key = trimmed.slice(0, idx).trim()
+        const val = trimmed.slice(idx + 1).trim()
+        if (!process.env[key]) {
+          process.env[key] = val
+        }
+      }
+    }
+  }
+}
+
 const firebaseConfig = {
-  apiKey: process.env.VITE_FIREBASE_API_KEY || "AIzaSyBHaXG_0I36k_j7nhfoD-CEh2-Lmk4-i0E",
-  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || "local-services-1f8fb.firebaseapp.com",
-  projectId: process.env.VITE_FIREBASE_PROJECT_ID || "local-services-1f8fb",
-  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || "local-services-1f8fb.firebasestorage.app",
-  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "109107015678",
-  appId: process.env.VITE_FIREBASE_APP_ID || "1:109107015678:web:8877b75ab3e1bc4a2b5aaf",
+  apiKey: process.env.VITE_FIREBASE_API_KEY || "",
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || "",
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID || "",
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: process.env.VITE_FIREBASE_APP_ID || "",
 }
 
 console.log("🚀 Initializing Firebase connection for project:", firebaseConfig.projectId)
