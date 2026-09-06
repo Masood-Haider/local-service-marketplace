@@ -5,13 +5,13 @@ import { getFirestore } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
 
 export const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAhMLTNgGQ4UlNXety7Kz0Wng1JA_9fHxo",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "marketplace-for-local-services.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "marketplace-for-local-services",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "marketplace-for-local-services.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "451028406744",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:451028406744:web:ca40165ea42c86d020e2ad",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-VD4PGT5CK1",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBHaXG_0I36k_j7nhfoD-CEh2-Lmk4-i0E",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "local-services-1f8fb.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "local-services-1f8fb",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "local-services-1f8fb.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "109107015678",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:109107015678:web:8877b75ab3e1bc4a2b5aaf",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-9W1PN0RFB0",
 }
 
 // Initialize Firebase only once
