@@ -248,13 +248,22 @@ export async function updateProviderVerification(
   })
 }
 
+import type { QuoteRequest } from "@/services/providerService"
+
+export type AdminQuoteRequest = QuoteRequest & { id: string }
+
 /**
- * Retrieves all jobs and bookings for the Admin Jobs & Bookings table.
+ * Retrieves all jobs, bookings, and direct quote requests for the Admin Jobs & Bookings table.
  */
-export async function fetchAdminJobsAndBookings(): Promise<{ jobs: Job[]; bookings: Booking[] }> {
-  const [jobsSnap, bookingsSnap] = await Promise.all([
+export async function fetchAdminJobsAndBookings(): Promise<{
+  jobs: Job[]
+  bookings: Booking[]
+  quoteRequests: AdminQuoteRequest[]
+}> {
+  const [jobsSnap, bookingsSnap, quotesSnap] = await Promise.all([
     getDocs(collection(db, "jobs")),
     getDocs(collection(db, "bookings")),
+    getDocs(collection(db, "quotes")),
   ])
 
   const jobs: Job[] = []
@@ -263,7 +272,10 @@ export async function fetchAdminJobsAndBookings(): Promise<{ jobs: Job[]; bookin
   const bookings: Booking[] = []
   bookingsSnap.forEach((d) => bookings.push({ ...(d.data() as any), id: d.id }))
 
-  return { jobs, bookings }
+  const quoteRequests: AdminQuoteRequest[] = []
+  quotesSnap.forEach((d) => quoteRequests.push({ ...(d.data() as any), id: d.id }))
+
+  return { jobs, bookings, quoteRequests }
 }
 
 /**

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react"
+import { Link } from "react-router-dom"
 import {
   fetchAdminJobsAndBookings,
   adminOverrideBookingStatus,
+  AdminQuoteRequest,
 } from "@/services/adminService"
 import { Booking, Job, BookingStatus, getBookingStatusBadge } from "@/services/jobService"
 import { useToast } from "@/hooks/useToast"
@@ -50,12 +52,17 @@ import {
   DollarSign,
   User,
   ShieldAlert,
+  MessageSquareQuote,
+  ExternalLink,
+  Calendar as CalendarIcon,
+  Phone,
 } from "lucide-react"
 
 export const AdminJobs: React.FC = () => {
   const { toast } = useToast()
   const [jobs, setJobs] = useState<Job[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
+  const [quoteRequests, setQuoteRequests] = useState<AdminQuoteRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [bookingStatusFilter, setBookingStatusFilter] = useState("all")
@@ -67,6 +74,7 @@ export const AdminJobs: React.FC = () => {
       const data = await fetchAdminJobsAndBookings()
       setJobs(data.jobs)
       setBookings(data.bookings)
+      setQuoteRequests(data.quoteRequests)
     } catch (err: any) {
       toast.error("Failed to load jobs & bookings", { description: err.message })
     } finally {
@@ -114,6 +122,20 @@ export const AdminJobs: React.FC = () => {
     )
   })
 
+  const filteredQuoteRequests = quoteRequests.filter((q) => {
+    const matchesSearch =
+      q.serviceNeeded?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      q.providerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      q.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      q.customerEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      q.serviceLocation?.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesStatus =
+      bookingStatusFilter === "all" || q.status === bookingStatusFilter
+
+    return matchesSearch && matchesStatus
+  })
+
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
@@ -146,6 +168,9 @@ export const AdminJobs: React.FC = () => {
             </TabsTrigger>
             <TabsTrigger value="jobs" className="data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 text-xs font-semibold">
               Job Requests ({jobs.length})
+            </TabsTrigger>
+            <TabsTrigger value="pro_requests" className="data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950 text-xs font-semibold">
+              Direct Pro Requests ({quoteRequests.length})
             </TabsTrigger>
           </TabsList>
 
@@ -379,6 +404,101 @@ export const AdminJobs: React.FC = () => {
                     icon={Briefcase}
                     title="No Jobs Found"
                     description="No customer jobs match your current search query."
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 3. DIRECT PRO QUOTE REQUESTS TAB */}
+        <TabsContent value="pro_requests">
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 shadow-xs overflow-hidden">
+            <CardContent className="p-0">
+              {filteredQuoteRequests.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800">
+                      <TableRow className="border-slate-200 dark:border-slate-800 hover:bg-transparent">
+                        <TableHead className="text-slate-600 dark:text-slate-400 font-semibold">Service & Details</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-400 font-semibold">Recipient Provider</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-400 font-semibold">Customer</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-400 font-semibold">Preferred Date</TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-400 font-semibold">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredQuoteRequests.map((req) => (
+                        <TableRow key={req.id} className="border-slate-200 dark:border-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                          <TableCell>
+                            <div className="max-w-xs">
+                              <p className="font-bold text-xs text-slate-900 dark:text-white">{req.serviceNeeded}</p>
+                              {req.projectDetails && (
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">
+                                  {req.projectDetails}
+                                </p>
+                              )}
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-1">
+                                <MapPin className="w-3 h-3 text-primary shrink-0" />
+                                <span className="truncate">{req.serviceLocation}</span>
+                              </p>
+                            </div>
+                          </TableCell>
+
+                          <TableCell>
+                            <div>
+                              <p className="font-semibold text-xs text-slate-900 dark:text-white">{req.providerName}</p>
+                              <Link
+                                to={`/providers/${req.providerId}`}
+                                target="_blank"
+                                className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline inline-flex items-center gap-1 mt-0.5"
+                              >
+                                View Profile <ExternalLink className="w-3 h-3" />
+                              </Link>
+                            </div>
+                          </TableCell>
+
+                          <TableCell className="text-xs text-slate-700 dark:text-slate-300">
+                            <p className="font-medium text-slate-900 dark:text-white">{req.customerName}</p>
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500">{req.customerEmail}</p>
+                            {req.customerPhone && (
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+                                <Phone className="w-3 h-3" /> {req.customerPhone}
+                              </p>
+                            )}
+                          </TableCell>
+
+                          <TableCell className="text-xs text-slate-700 dark:text-slate-300">
+                            <span className="flex items-center gap-1">
+                              <CalendarIcon className="w-3.5 h-3.5 text-primary shrink-0" />
+                              {req.preferredDate || "Flexible"}
+                            </span>
+                          </TableCell>
+
+                          <TableCell>
+                            <Badge
+                              className={`text-[10px] capitalize font-bold ${
+                                req.status === "quoted"
+                                  ? "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30"
+                                  : req.status === "declined"
+                                  ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                                  : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                              }`}
+                            >
+                              {req.status || "pending"}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="py-12">
+                  <EmptyState
+                    icon={MessageSquareQuote}
+                    title="No Direct Requests Found"
+                    description="No direct quote requests have been sent to service providers yet."
                   />
                 </div>
               )}
