@@ -98,11 +98,6 @@ export const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/admin" className="hover:text-primary transition-colors">
-                  Admin Console
-                </Link>
-              </li>
-              <li>
                 <span className="hover:text-primary cursor-pointer transition-colors">
                   Privacy Policy
                 </span>
