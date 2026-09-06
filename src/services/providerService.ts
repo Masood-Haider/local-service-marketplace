@@ -39,6 +39,7 @@ export interface ProviderProfile {
 export interface QuoteRequest {
   providerId: string
   providerName: string
+  customerId?: string
   customerName: string
   customerEmail: string
   customerPhone?: string

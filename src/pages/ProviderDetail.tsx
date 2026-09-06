@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { useParams, Link } from "react-router-dom"
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/hooks/useToast"
 import {
@@ -40,12 +40,17 @@ import {
   MessageSquare,
   Sparkles,
   AlertTriangle,
+  Lock,
+  LogIn,
+  UserPlus,
 } from "lucide-react"
 
 export const ProviderDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const { currentUser } = useAuth()
   const { toast } = useToast()
+  const navigate = useNavigate()
+  const location = useLocation()
 
   const [provider, setProvider] = useState<ProviderProfile | null>(null)
   const [loading, setLoading] = useState(true)
@@ -114,9 +119,24 @@ export const ProviderDetail: React.FC = () => {
     return `${y}-${m}-${d}`
   }, [])
 
+  useEffect(() => {
+    if (currentUser) {
+      if (!customerName && currentUser.name) setCustomerName(currentUser.name)
+      if (!customerEmail && currentUser.email) setCustomerEmail(currentUser.email)
+    }
+  }, [currentUser])
+
   const handleQuoteSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!id || !provider) return
+
+    if (!currentUser) {
+      toast.error("Authentication required", {
+        description: "Please log in to your customer account to send a quote request.",
+      })
+      navigate("/login", { state: { from: location.pathname } })
+      return
+    }
 
     if (!customerName || !customerEmail || !serviceNeeded || !serviceLocation) {
       toast.error("Please fill in all required quote request fields")
@@ -135,6 +155,7 @@ export const ProviderDetail: React.FC = () => {
       await submitQuoteRequest({
         providerId: id,
         providerName: provider.name,
+        customerId: currentUser.uid,
         customerName: customerName.trim(),
         customerEmail: customerEmail.trim(),
         customerPhone: customerPhone.trim(),
@@ -260,108 +281,147 @@ export const ProviderDetail: React.FC = () => {
                 </DialogDescription>
               </DialogHeader>
 
-              <form onSubmit={handleQuoteSubmit} className="space-y-4 py-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {!currentUser ? (
+                <div className="py-8 px-2 text-center space-y-5">
+                  <div className="h-14 w-14 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center mx-auto shadow-xs">
+                    <Lock className="w-7 h-7" />
+                  </div>
+                  <div className="space-y-2 max-w-sm mx-auto">
+                    <h3 className="font-bold text-lg text-foreground tracking-tight">
+                      Login Required to Request a Quote
+                    </h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      You must be signed in with an active account to request quotes from <strong className="text-foreground">{provider.name}</strong> so they can reply directly with your estimate.
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2 max-w-xs mx-auto">
+                    <Button
+                      type="button"
+                      className="flex-1 font-semibold gap-2"
+                      onClick={() => {
+                        setQuoteOpen(false)
+                        navigate("/login", { state: { from: location.pathname } })
+                      }}
+                    >
+                      <LogIn className="w-4 h-4" /> Log In
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1 font-semibold gap-2"
+                      onClick={() => {
+                        setQuoteOpen(false)
+                        navigate("/register", { state: { from: location.pathname } })
+                      }}
+                    >
+                      <UserPlus className="w-4 h-4" /> Sign Up
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleQuoteSubmit} className="space-y-4 py-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                        Your Name *
+                      </label>
+                      <Input
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        placeholder="Alex Johnson"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                        Your Email *
+                      </label>
+                      <Input
+                        type="email"
+                        value={customerEmail}
+                        onChange={(e) => setCustomerEmail(e.target.value)}
+                        placeholder="alex@example.com"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                        Phone Number
+                      </label>
+                      <Input
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(e.target.value)}
+                        placeholder="(555) 000-0000"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                        Preferred Date
+                      </label>
+                      <Input
+                        type="date"
+                        min={todayDateString}
+                        value={preferredDate}
+                        onChange={(e) => setPreferredDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                      Your Name *
+                      Job Location / Zip Code *
                     </label>
                     <Input
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="Alex Johnson"
+                      value={serviceLocation}
+                      onChange={(e) => setServiceLocation(e.target.value)}
+                      placeholder="e.g. 94103 San Francisco"
                       required
                     />
                   </div>
+
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                      Your Email *
+                      Service Needed *
                     </label>
                     <Input
-                      type="email"
-                      value={customerEmail}
-                      onChange={(e) => setCustomerEmail(e.target.value)}
-                      placeholder="alex@example.com"
+                      value={serviceNeeded}
+                      onChange={(e) => setServiceNeeded(e.target.value)}
+                      placeholder="e.g. Water heater repair, electrical panel upgrade"
                       required
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                      Phone Number
+                      Project Description & Details
                     </label>
-                    <Input
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      placeholder="(555) 000-0000"
+                    <textarea
+                      value={projectDetails}
+                      onChange={(e) => setProjectDetails(e.target.value)}
+                      rows={3}
+                      className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="Describe specific symptoms, materials, or special access instructions..."
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                      Preferred Date
-                    </label>
-                    <Input
-                      type="date"
-                      min={todayDateString}
-                      value={preferredDate}
-                      onChange={(e) => setPreferredDate(e.target.value)}
-                    />
-                  </div>
-                </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                    Job Location / Zip Code *
-                  </label>
-                  <Input
-                    value={serviceLocation}
-                    onChange={(e) => setServiceLocation(e.target.value)}
-                    placeholder="e.g. 94103 San Francisco"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                    Service Needed *
-                  </label>
-                  <Input
-                    value={serviceNeeded}
-                    onChange={(e) => setServiceNeeded(e.target.value)}
-                    placeholder="e.g. Water heater repair, electrical panel upgrade"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                    Project Description & Details
-                  </label>
-                  <textarea
-                    value={projectDetails}
-                    onChange={(e) => setProjectDetails(e.target.value)}
-                    rows={3}
-                    className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    placeholder="Describe specific symptoms, materials, or special access instructions..."
-                  />
-                </div>
-
-                <DialogFooter className="pt-4">
-                  <Button type="submit" className="w-full h-11 gap-2" disabled={submittingQuote}>
-                    {submittingQuote ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" /> Sending Quote Request...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4" /> Submit Request
-                      </>
-                    )}
-                  </Button>
-                </DialogFooter>
-              </form>
+                  <DialogFooter className="pt-4">
+                    <Button type="submit" className="w-full h-11 gap-2" disabled={submittingQuote}>
+                      {submittingQuote ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" /> Sending Quote Request...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" /> Submit Request
+                        </>
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              )}
             </DialogContent>
           </Dialog>
         </div>

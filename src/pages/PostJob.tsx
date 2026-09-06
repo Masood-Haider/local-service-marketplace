@@ -18,6 +18,7 @@ import {
   Clock,
   Loader2,
   CheckCircle2,
+  Lock,
 } from "lucide-react"
 
 export const PostJob: React.FC = () => {
@@ -34,6 +35,13 @@ export const PostJob: React.FC = () => {
   const [customerName, setCustomerName] = useState(currentUser?.name || "")
   const [customerEmail, setCustomerEmail] = useState(currentUser?.email || "")
   const [submitting, setSubmitting] = useState(false)
+
+  React.useEffect(() => {
+    if (currentUser) {
+      if (!customerName && currentUser.name) setCustomerName(currentUser.name)
+      if (!customerEmail && currentUser.email) setCustomerEmail(currentUser.email)
+    }
+  }, [currentUser])
 
   const categories = [
     "Plumbing",
@@ -58,6 +66,14 @@ export const PostJob: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (!currentUser) {
+      toast.error("Authentication required", {
+        description: "You must be signed in as a customer to post a job request.",
+      })
+      navigate("/login", { state: { from: "/post-job" } })
+      return
+    }
+
     if (!title.trim() || !description.trim() || !location.trim()) {
       toast.error("Required fields missing", {
         description: "Please provide a title, location, and project description.",
@@ -75,9 +91,9 @@ export const PostJob: React.FC = () => {
     setSubmitting(true)
     try {
       const jobId = await createJob({
-        customerId: currentUser?.uid || "guest-" + Date.now(),
-        customerName: currentUser?.name || customerName || "Customer",
-        customerEmail: currentUser?.email || customerEmail || "customer@example.com",
+        customerId: currentUser.uid,
+        customerName: currentUser.name || customerName || "Customer",
+        customerEmail: currentUser.email || customerEmail || "customer@example.com",
         title: title.trim(),
         category,
         description: description.trim(),
@@ -101,11 +117,39 @@ export const PostJob: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 max-w-3xl">
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 max-w-3xl space-y-6">
       <PageHeader
         title="Post a Service Request"
         description="Describe your project to receive real-time bids and transparent quotes from certified local pros."
       />
+
+      {!currentUser && (
+        <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 text-amber-700 dark:text-amber-300">
+            <Lock className="w-4 h-4 shrink-0" />
+            <span>You must be logged in to post a request and receive quotes from certified providers.</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 text-xs font-semibold"
+              onClick={() => navigate("/login", { state: { from: "/post-job" } })}
+            >
+              Log In
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs font-semibold"
+              onClick={() => navigate("/register", { state: { from: "/post-job" } })}
+            >
+              Sign Up
+            </Button>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card className="shadow-sm border-border">
