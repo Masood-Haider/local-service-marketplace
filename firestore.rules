@@ -284,7 +284,11 @@ service cloud.firestore {
       );
       allow create: if isAuthenticated();
       allow update, delete: if isAdmin() || (
-        isAuthenticated() && resource.data.providerId == request.auth.uid
+        isAuthenticated() && (
+          resource.data.providerId == request.auth.uid ||
+          resource.data.customerId == request.auth.uid ||
+          resource.data.customerEmail == request.auth.token.email
+        )
       );
     }
     // ============================================================================

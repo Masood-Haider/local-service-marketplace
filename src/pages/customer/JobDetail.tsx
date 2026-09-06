@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { useParams, Link } from "react-router-dom"
+import { useParams, Link, useNavigate } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/hooks/useToast"
 import {
@@ -7,6 +7,7 @@ import {
   listenToJobQuotes,
   acceptJobQuoteWithSlot,
   declineJobQuote,
+  deleteCustomerJob,
   Job,
   JobQuote,
 } from "@/services/jobService"
@@ -39,16 +40,19 @@ import {
   Sparkles,
   AlertCircle,
   ChevronDown,
+  Trash2,
 } from "lucide-react"
 
 export const JobDetail: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>()
+  const navigate = useNavigate()
   const { currentUser } = useAuth()
   const { toast } = useToast()
 
   const [job, setJob] = useState<Job | null>(null)
   const [quotes, setQuotes] = useState<JobQuote[]>([])
   const [loadingJob, setLoadingJob] = useState(true)
+  const [deleting, setDeleting] = useState(false)
 
   // Scheduling Modal State
   const [schedulingQuote, setSchedulingQuote] = useState<JobQuote | null>(null)
@@ -155,6 +159,30 @@ export const JobDetail: React.FC = () => {
     }
   }
 
+  const handleDeleteJob = async () => {
+    if (!job) return
+    if (
+      !window.confirm(
+        `Are you sure you want to delete your service request "${job.title}"? This will permanently delete this posting and any quotes received.`
+      )
+    ) {
+      return
+    }
+
+    setDeleting(true)
+    try {
+      await deleteCustomerJob(job.id)
+      toast.success("Service request deleted", {
+        description: `"${job.title}" was permanently removed.`,
+      })
+      navigate("/dashboard/customer")
+    } catch (err: any) {
+      console.error("Failed to delete request:", err)
+      toast.error("Failed to delete request", { description: err.message })
+      setDeleting(false)
+    }
+  }
+
   if (loadingJob) {
     return (
       <div className="py-20 flex flex-col items-center justify-center space-y-3">
@@ -183,12 +211,31 @@ export const JobDetail: React.FC = () => {
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-12">
-      <Link
-        to="/dashboard/customer"
-        className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-      </Link>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <Link
+          to="/dashboard/customer"
+          className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+        </Link>
+
+        {currentUser?.uid === job.customerId && !isBooked && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDeleteJob}
+            disabled={deleting}
+            className="text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 border-destructive/30 gap-1.5"
+          >
+            {deleting ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="w-3.5 h-3.5 text-destructive" />
+            )}
+            Delete Request
+          </Button>
+        )}
+      </div>
 
       {/* Job Overview Card */}
       <Card className="border-border shadow-sm">

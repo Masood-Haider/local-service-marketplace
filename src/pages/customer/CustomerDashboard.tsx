@@ -8,6 +8,7 @@ import {
   listenToJobQuotes,
   acceptJobQuoteWithSlot,
   declineJobQuote,
+  deleteCustomerJob,
   getBookingStatusBadge,
   Job,
   JobQuote,
@@ -42,6 +43,7 @@ import {
   Sparkles,
   ChevronDown,
   Tag,
+  Trash2,
 } from "lucide-react"
 
 const timeSlots = [
@@ -140,6 +142,31 @@ export const CustomerDashboard: React.FC = () => {
     } catch (err: any) {
       console.error("Failed to decline quote:", err)
       toast.error("Failed to decline quote", { description: err.message })
+    }
+  }
+
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null)
+
+  const handleDeleteJob = async (jobId: string, title: string) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete your service request "${title}"? This will permanently remove the request and any bids received.`
+      )
+    ) {
+      return
+    }
+
+    setDeletingJobId(jobId)
+    try {
+      await deleteCustomerJob(jobId)
+      toast.success("Service request deleted", {
+        description: `"${title}" has been permanently removed.`,
+      })
+    } catch (err: any) {
+      console.error("Failed to delete job request:", err)
+      toast.error("Failed to delete request", { description: err.message })
+    } finally {
+      setDeletingJobId(null)
     }
   }
 
@@ -492,13 +519,30 @@ export const CustomerDashboard: React.FC = () => {
 
                   <CardFooter className="border-t border-border/60 pt-3.5 flex items-center justify-between bg-muted/20">
                     <span className="text-xs text-muted-foreground">
-                      {jobQuotes.length > 0 ? `${jobQuotes.length} quote(s) pending your review` : "Awaiting provider proposals"}
+                      {jobQuotes.length > 0 ? `${jobQuotes.length} quote(s) pending your review` : "Awaiting proposals"}
                     </span>
-                    <Link to={`/dashboard/customer/jobs/${job.id}`}>
-                      <Button size="sm" className="gap-1.5 text-xs h-8">
-                        View Quotes & Details <ArrowRight className="w-3.5 h-3.5" />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs h-8 px-2.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 border-border gap-1"
+                        onClick={() => handleDeleteJob(job.id, job.title)}
+                        disabled={deletingJobId === job.id}
+                        title="Delete service request"
+                      >
+                        {deletingJobId === job.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                        Delete
                       </Button>
-                    </Link>
+                      <Link to={`/dashboard/customer/jobs/${job.id}`}>
+                        <Button size="sm" className="gap-1.5 text-xs h-8">
+                          Quotes & Details <ArrowRight className="w-3.5 h-3.5" />
+                        </Button>
+                      </Link>
+                    </div>
                   </CardFooter>
                 </Card>
               )

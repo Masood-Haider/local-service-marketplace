@@ -4,7 +4,9 @@ import {
   addDoc,
   setDoc,
   getDoc,
+  getDocs,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -129,6 +131,31 @@ export async function createJob(
     createdAt: serverTimestamp(),
   })
   return docRef.id
+}
+
+/**
+ * Deletes a customer's service request / job posting from Firestore,
+ * cleaning up any associated quotes in its subcollection.
+ */
+export async function deleteCustomerJob(jobId: string): Promise<void> {
+  // 1. Delete quotes in subcollection jobs/{jobId}/quotes
+  try {
+    const quotesCol = collection(db, "jobs", jobId, "quotes")
+    const quotesSnap = await getDocs(quotesCol)
+    if (!quotesSnap.empty) {
+      const batch = writeBatch(db)
+      quotesSnap.forEach((qDoc) => {
+        batch.delete(qDoc.ref)
+      })
+      await batch.commit()
+    }
+  } catch (err) {
+    console.warn("Error cleaning up job quotes subcollection:", err)
+  }
+
+  // 2. Delete the job document itself
+  const jobRef = doc(db, "jobs", jobId)
+  await deleteDoc(jobRef)
 }
 
 /**
