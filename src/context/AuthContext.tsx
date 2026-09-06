@@ -23,7 +23,7 @@ export interface UserProfile {
 
 // Configured admin emails for immediate admin access in staging/development
 const HARDCODED_ADMIN_EMAILS = [
-  "admin@hub.local",
+  "admin123@gmail.com",
   "admin@example.com",
   "admin@homeserviceshub.com",
 ]
