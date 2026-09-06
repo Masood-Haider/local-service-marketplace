@@ -30,6 +30,8 @@ export function getFirebaseAuthErrorMessage(error: any): string {
       return "The Google sign-in popup was blocked by your browser. Please enable popups for this site."
     case "auth/account-exists-with-different-credential":
       return "An account already exists with this email using a different sign-in method. Please sign in with your original method."
+    case "auth/unauthorized-domain":
+      return "This domain is not authorized in Firebase for Google Sign-In. Please add your current domain (e.g. localhost or 127.0.0.1) in Firebase Console under Authentication > Settings > Authorized domains."
     default:
       return error.message || "Authentication failed. Please try again."
   }
