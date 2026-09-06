@@ -175,6 +175,42 @@ export const ProviderDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* Verification Status Banner */}
+      {profile && profile.verificationStatus === "pending" && (
+        <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-foreground text-sm">Account Verification Pending</h4>
+                <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40 text-[10px]">Superadmin Review</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground max-w-2xl leading-relaxed">
+                Your trade specialist profile is currently under review by our superadmin team. Once approved, your business will automatically be discoverable to local customers on the marketplace.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {profile && profile.verificationStatus === "rejected" && (
+        <div className="rounded-2xl bg-destructive/10 border border-destructive/30 p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-xl bg-destructive/20 text-destructive shrink-0">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="font-bold text-foreground text-sm">Verification Not Approved</h4>
+              <p className="text-xs text-muted-foreground max-w-2xl leading-relaxed">
+                Your application could not be verified by the superadmin. Please update your profile information or contact platform support.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stats row */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
         <Card>

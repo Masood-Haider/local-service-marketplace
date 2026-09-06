@@ -227,7 +227,7 @@ export async function fetchAdminProviders(): Promise<AdminProvider[]> {
       avgRating: typeof data.avgRating === "number" ? data.avgRating : 5.0,
       totalReviews: typeof data.totalReviews === "number" ? data.totalReviews : 0,
       photoURL: data.photoURL,
-      verificationStatus: data.verificationStatus || "approved",
+      verificationStatus: data.verificationStatus || "pending",
       createdAt: data.createdAt,
     })
   })

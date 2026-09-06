@@ -108,7 +108,7 @@ export const AdminProviders: React.FC = () => {
     const matchesCategory =
       categoryFilter === "All" || p.category === categoryFilter
 
-    const currentStatus = p.verificationStatus || "approved"
+    const currentStatus = p.verificationStatus || "pending"
     const matchesStatus =
       statusFilter === "all" || currentStatus === statusFilter
 

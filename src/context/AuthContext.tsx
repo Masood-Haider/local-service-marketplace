@@ -180,7 +180,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           portfolioImages: [],
           avgRating: 5.0,
           totalReviews: 0,
-          verificationStatus: "approved",
+          verificationStatus: "pending",
           createdAt: serverTimestamp(),
         }, { merge: true })
       }
@@ -350,7 +350,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           portfolioImages: [],
           avgRating: 5.0,
           totalReviews: 0,
-          verificationStatus: "approved",
+          verificationStatus: "pending",
           createdAt: serverTimestamp(),
         }, { merge: true })
       }

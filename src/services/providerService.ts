@@ -32,6 +32,7 @@ export interface ProviderProfile {
   totalReviews: number
   phone?: string
   email?: string
+  verificationStatus?: "approved" | "pending" | "rejected"
   createdAt?: any
   updatedAt?: any
 }
@@ -129,7 +130,11 @@ export async function saveProviderProfile(
   }
 
   if (!existingSnap.exists()) {
-    (docPayload as any).createdAt = serverTimestamp()
+    ;(docPayload as any).createdAt = serverTimestamp()
+    ;(docPayload as any).verificationStatus = "pending"
+  } else {
+    // Retain existing verification status so providers cannot self-approve
+    ;(docPayload as any).verificationStatus = existingSnap.data().verificationStatus || "pending"
   }
 
   await setDoc(providerRef, docPayload, { merge: true })
@@ -246,7 +251,8 @@ export async function fetchProvidersWithQuery(params: QueryProvidersParams): Pro
     )
   }
 
-  return results
+  // Only superadmin-approved providers are publicly discoverable on the marketplace
+  return results.filter((p) => p.verificationStatus === "approved")
 }
 
 /**

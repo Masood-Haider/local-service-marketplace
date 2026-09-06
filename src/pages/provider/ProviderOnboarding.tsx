@@ -156,9 +156,9 @@ export const ProviderOnboarding: React.FC = () => {
       })
 
       toast.success("Provider Profile Saved!", {
-        description: "Your business is now live on the marketplace.",
+        description: "Your business profile has been submitted and is pending verification by the superadmin.",
       })
-      navigate(`/providers/${currentUser.uid}`)
+      navigate("/dashboard/provider")
     } catch (err: any) {
       toast.error("Could not save profile", {
         description: err.message || "An error occurred while writing to Firestore.",
