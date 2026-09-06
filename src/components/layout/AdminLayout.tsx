@@ -116,12 +116,9 @@ export const AdminLayout: React.FC = () => {
           {!collapsed ? (
             <div className="px-3 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <p className="text-xs font-bold text-amber-300 uppercase tracking-wider">
-                    Superadmin
-                  </p>
-                </div>
+                <p className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                  Superadmin
+                </p>
                 <Badge className="bg-amber-500/20 text-amber-300 text-[10px] px-1.5 py-0 border-amber-500/30">
                   Live
                 </Badge>
@@ -130,11 +127,7 @@ export const AdminLayout: React.FC = () => {
                 {currentUser?.email || "admin@hub.local"}
               </p>
             </div>
-          ) : (
-            <div className="flex justify-center">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" title="System Live" />
-            </div>
-          )}
+          ) : null}
 
           {/* Nav Items */}
           <NavItemsContent />
