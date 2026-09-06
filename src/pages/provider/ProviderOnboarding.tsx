@@ -5,7 +5,6 @@ import { useToast } from "@/hooks/useToast"
 import {
   saveProviderProfile,
   getProviderProfile,
-  uploadToStorage,
   ProviderProfile,
 } from "@/services/providerService"
 import { PageHeader } from "@/components/shared/PageHeader"
@@ -15,7 +14,6 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
-  Upload,
   Image as ImageIcon,
   Loader2,
   CheckCircle2,
@@ -26,6 +24,8 @@ import {
   Phone,
   Sparkles,
   Eye,
+  Link2,
+  PlusCircle,
 } from "lucide-react"
 
 export const ProviderOnboarding: React.FC = () => {
@@ -42,10 +42,8 @@ export const ProviderOnboarding: React.FC = () => {
   const [phone, setPhone] = useState("")
   const [photoURL, setPhotoURL] = useState(currentUser?.photoURL || "")
   const [portfolioImages, setPortfolioImages] = useState<string[]>([])
+  const [newPortfolioUrl, setNewPortfolioUrl] = useState("")
 
-  // Upload & Progress states
-  const [profileProgress, setProfileProgress] = useState<number | null>(null)
-  const [portfolioProgress, setPortfolioProgress] = useState<{ [key: string]: number }>({})
   const [submitting, setSubmitting] = useState(false)
   const [loadingInitial, setLoadingInitial] = useState(true)
 
@@ -76,50 +74,28 @@ export const ProviderOnboarding: React.FC = () => {
     loadData()
   }, [currentUser])
 
-  // Handle Profile Photo Upload
-  const handleProfilePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !currentUser?.uid) return
+  // Handle adding a portfolio image via URL
+  const handleAddPortfolioUrl = () => {
+    const url = newPortfolioUrl.trim()
+    if (!url) return
 
-    setProfileProgress(10)
-    try {
-      const path = `providers/${currentUser.uid}/profile_${Date.now()}_${file.name}`
-      const url = await uploadToStorage(file, path, (pct) => setProfileProgress(pct))
-      setPhotoURL(url)
-      toast.success("Profile photo uploaded!")
-    } catch (err: any) {
-      toast.error("Upload failed", { description: err.message })
-    } finally {
-      setProfileProgress(null)
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      toast.error("Invalid image URL", {
+        description: "Please enter a valid web image URL starting with https://",
+      })
+      return
     }
-  }
 
-  // Handle Portfolio Images Upload
-  const handlePortfolioSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files || files.length === 0 || !currentUser?.uid) return
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      const fileKey = `${file.name}-${i}`
-      setPortfolioProgress((prev) => ({ ...prev, [fileKey]: 10 }))
-
-      try {
-        const path = `providers/${currentUser.uid}/portfolio_${Date.now()}_${file.name}`
-        const url = await uploadToStorage(file, path, (pct) => {
-          setPortfolioProgress((prev) => ({ ...prev, [fileKey]: pct }))
-        })
-        setPortfolioImages((prev) => [...prev, url])
-      } catch (err: any) {
-        toast.error(`Failed to upload ${file.name}`)
-      } finally {
-        setPortfolioProgress((prev) => {
-          const next = { ...prev }
-          delete next[fileKey]
-          return next
-        })
-      }
+    if (portfolioImages.includes(url)) {
+      toast.error("Duplicate image", {
+        description: "This image URL has already been added to your portfolio.",
+      })
+      return
     }
+
+    setPortfolioImages((prev) => [...prev, url])
+    setNewPortfolioUrl("")
+    toast.success("Portfolio image added!")
   }
 
   const handleRemovePortfolio = (index: number) => {
@@ -330,99 +306,87 @@ export const ProviderOnboarding: React.FC = () => {
             {/* 1. Profile Headshot */}
             <div>
               <label className="text-sm font-medium text-foreground block mb-2">
-                Profile Photo / Business Logo
+                Profile Photo / Business Logo (URL)
               </label>
-              <div className="flex items-center gap-5">
-                <Avatar className="h-20 w-20 rounded-2xl border-2 border-border shadow-sm">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+                <Avatar className="h-20 w-20 rounded-2xl border-2 border-border shadow-sm shrink-0">
                   <AvatarImage src={photoURL} />
                   <AvatarFallback className="text-lg font-bold bg-muted text-muted-foreground">
                     {name?.[0]?.toUpperCase() || "P"}
                   </AvatarFallback>
                 </Avatar>
 
-                <div className="flex-1 space-y-2">
-                  <label className="cursor-pointer inline-block">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleProfilePhotoSelect}
-                      disabled={profileProgress !== null}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 pointer-events-none"
-                      disabled={profileProgress !== null}
-                    >
-                      <Upload className="w-4 h-4" />
-                      {profileProgress !== null ? "Uploading..." : "Choose Profile Photo"}
-                    </Button>
-                  </label>
-                  {profileProgress !== null && (
-                    <div className="w-full max-w-xs space-y-1">
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary transition-all duration-300"
-                          style={{ width: `${profileProgress}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">{profileProgress}% uploaded</p>
+                <div className="flex-1 w-full space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Link2 className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                      <Input
+                        value={photoURL}
+                        onChange={(e) => setPhotoURL(e.target.value.trim())}
+                        placeholder="Paste image URL (e.g. https://images.unsplash.com/...)"
+                        className="pl-9 text-xs"
+                      />
                     </div>
-                  )}
-                  <p className="text-xs text-muted-foreground">JPG, PNG or WEBP up to 5MB.</p>
+                    {photoURL && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-muted-foreground hover:text-destructive h-9"
+                        onClick={() => setPhotoURL("")}
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Enter a direct image link (HTTPS) from Unsplash, Imgur, Cloudinary, or any web host.
+                  </p>
                 </div>
               </div>
             </div>
 
             {/* 2. Portfolio Gallery */}
             <div className="border-t border-border/80 pt-6">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <label className="text-sm font-medium text-foreground block">
-                    Portfolio & Work Samples ({portfolioImages.length})
-                  </label>
-                  <p className="text-xs text-muted-foreground">
-                    Show before-and-after pictures or past completed installations.
-                  </p>
-                </div>
-
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handlePortfolioSelect}
-                  />
-                  <Button type="button" variant="outline" size="sm" className="gap-1.5 pointer-events-none">
-                    <Upload className="w-4 h-4" /> Upload Samples
-                  </Button>
+              <div className="mb-3">
+                <label className="text-sm font-medium text-foreground block">
+                  Portfolio & Work Samples ({portfolioImages.length})
                 </label>
-              </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Add image URLs of your past completed projects or before-and-after transformations.
+                </p>
 
-              {/* Uploading progress items */}
-              {Object.keys(portfolioProgress).length > 0 && (
-                <div className="p-3 bg-muted/40 rounded-lg space-y-2 mb-4 border border-border">
-                  <p className="text-xs font-semibold text-foreground">Uploading images...</p>
-                  {Object.entries(portfolioProgress).map(([fileKey, pct]) => (
-                    <div key={fileKey} className="space-y-1">
-                      <div className="flex justify-between text-[11px] text-muted-foreground">
-                        <span className="truncate max-w-[200px]">{fileKey}</span>
-                        <span>{pct}%</span>
-                      </div>
-                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  ))}
+                {/* Add Portfolio Image via URL */}
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Link2 className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                    <Input
+                      value={newPortfolioUrl}
+                      onChange={(e) => setNewPortfolioUrl(e.target.value)}
+                      placeholder="Paste work sample image URL (e.g. https://images.unsplash.com/...)"
+                      className="pl-9 text-xs"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault()
+                          handleAddPortfolioUrl()
+                        }
+                      }}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="gap-1.5 text-xs h-9 px-4 shrink-0"
+                    onClick={handleAddPortfolioUrl}
+                  >
+                    <PlusCircle className="w-4 h-4" /> Add Image
+                  </Button>
                 </div>
-              )}
+              </div>
 
               {/* Portfolio Grid Previews */}
               {portfolioImages.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
                   {portfolioImages.map((img, idx) => (
                     <div
                       key={idx}
@@ -445,11 +409,11 @@ export const ProviderOnboarding: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <div className="border border-dashed border-border rounded-xl p-8 text-center text-muted-foreground bg-card/40">
+                <div className="border border-dashed border-border rounded-xl p-8 text-center text-muted-foreground bg-card/40 mt-4">
                   <ImageIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm font-medium text-foreground">No portfolio photos added yet</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Pros with 3+ photos receive 4x more customer quote inquiries.
+                    Paste any image URL above and click "Add Image" to showcase your work.
                   </p>
                 </div>
               )}
