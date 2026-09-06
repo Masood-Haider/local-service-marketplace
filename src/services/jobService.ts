@@ -552,6 +552,7 @@ export async function acceptDirectQuote(
     jobTitle: quote.serviceNeeded,
     customerId: quote.customerId || "",
     customerName: quote.customerName,
+    customerEmail: quote.customerEmail || "",
     providerId: quote.providerId,
     providerName: quote.providerName,
     category: quote.serviceNeeded,
@@ -560,6 +561,7 @@ export async function acceptDirectQuote(
     location: quote.serviceLocation,
     status: "confirmed",
     createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   })
 
   if (quote.customerId) {

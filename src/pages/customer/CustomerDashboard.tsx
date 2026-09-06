@@ -214,12 +214,12 @@ export const CustomerDashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active Bookings</CardTitle>
-            <CalendarIcon className="w-4 h-4 text-emerald-500" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Accepted Offers</CardTitle>
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{bookings.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Confirmed appointments</p>
+            <p className="text-xs text-muted-foreground mt-1">Confirmed & scheduled</p>
           </CardContent>
         </Card>
 
@@ -237,29 +237,29 @@ export const CustomerDashboard: React.FC = () => {
                 </Badge>
               )}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Quotes awaiting decision</p>
+            <p className="text-xs text-muted-foreground mt-1">Quotes awaiting review</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Open Job Posts</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Open Requests</CardTitle>
             <Clock className="w-4 h-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{openJobs.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Receiving pro quotes</p>
+            <p className="text-xs text-muted-foreground mt-1">Awaiting pro proposals</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Requests</CardTitle>
-            <CheckCircle2 className="w-4 h-4 text-primary" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Postings</CardTitle>
+            <CalendarIcon className="w-4 h-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{jobs.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Lifetime postings</p>
+            <p className="text-xs text-muted-foreground mt-1">Lifetime requests</p>
           </CardContent>
         </Card>
       </div>
@@ -353,14 +353,14 @@ export const CustomerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Upcoming Confirmed Bookings Section */}
+      {/* Accepted Offers & Scheduled Appointments Section */}
       {bookings.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h3 className="text-xl font-bold text-foreground">Upcoming Service Appointments</h3>
-              <Badge variant="outline" className="text-xs">
-                {bookings.length} Appointment{bookings.length === 1 ? "" : "s"}
+              <h3 className="text-xl font-bold text-foreground">Accepted Offers & Scheduled Appointments</h3>
+              <Badge variant="outline" className="text-xs font-semibold">
+                {bookings.length} Confirmed
               </Badge>
             </div>
             <Link to="/dashboard/customer/bookings">
@@ -386,9 +386,14 @@ export const CustomerDashboard: React.FC = () => {
                       </div>
                       <CardTitle className="text-base font-bold line-clamp-1">{booking.jobTitle}</CardTitle>
                     </div>
-                    <Badge className={statusInfo.className}>
-                      {statusInfo.label}
-                    </Badge>
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-semibold gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Accepted Offer
+                      </Badge>
+                      <Badge className={statusInfo.className}>
+                        {statusInfo.label}
+                      </Badge>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-2 pt-0 text-xs">
                     <div className="flex items-center justify-between py-1 border-b border-border/50">
@@ -424,18 +429,17 @@ export const CustomerDashboard: React.FC = () => {
               <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             </div>
             <p className="text-xs text-muted-foreground">
-              Real-time bids and status tracking
+              Open requests awaiting quotes (confirmed jobs move to Accepted Offers above)
             </p>
           </div>
           <Badge variant="outline" className="text-xs">
-            {jobs.length} Total
+            {openJobs.length} Open
           </Badge>
         </div>
 
-        {jobs.length > 0 ? (
+        {openJobs.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {jobs.map((job) => {
-              const isBooked = job.status === "booked"
+            {openJobs.map((job) => {
               const jobQuotes = (quotesByJob[job.id] || []).filter((q) => !q.status || q.status === "pending")
 
               return (
@@ -445,17 +449,15 @@ export const CustomerDashboard: React.FC = () => {
                       <div>
                         <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                           <Badge
-                            variant={isBooked ? "default" : "secondary"}
-                            className={`text-[10px] uppercase font-bold ${
-                              isBooked ? "bg-emerald-600 text-white" : "bg-primary/10 text-primary"
-                            }`}
+                            variant="secondary"
+                            className="text-[10px] uppercase font-bold bg-primary/10 text-primary"
                           >
-                            {isBooked ? "Booked" : "Open for quotes"}
+                            Open for quotes
                           </Badge>
                           <Badge variant="outline" className="text-[10px] font-semibold text-primary border-primary/30">
                             {job.category}
                           </Badge>
-                          {!isBooked && jobQuotes.length > 0 && (
+                          {jobQuotes.length > 0 && (
                             <Badge className="bg-emerald-500 text-white text-[10px] font-bold">
                               {jobQuotes.length} Quote{jobQuotes.length === 1 ? "" : "s"} Received
                             </Badge>
@@ -468,7 +470,7 @@ export const CustomerDashboard: React.FC = () => {
                           Budget
                         </span>
                         <span className="font-bold text-sm text-foreground">
-                          {isBooked ? job.bookedPrice || job.budget : job.budget}
+                          {job.budget}
                         </span>
                       </div>
                     </div>
@@ -490,7 +492,7 @@ export const CustomerDashboard: React.FC = () => {
 
                   <CardFooter className="border-t border-border/60 pt-3.5 flex items-center justify-between bg-muted/20">
                     <span className="text-xs text-muted-foreground">
-                      {isBooked ? "Provider confirmed" : jobQuotes.length > 0 ? `${jobQuotes.length} quote(s) pending your review` : "Awaiting provider proposals"}
+                      {jobQuotes.length > 0 ? `${jobQuotes.length} quote(s) pending your review` : "Awaiting provider proposals"}
                     </span>
                     <Link to={`/dashboard/customer/jobs/${job.id}`}>
                       <Button size="sm" className="gap-1.5 text-xs h-8">
@@ -504,12 +506,16 @@ export const CustomerDashboard: React.FC = () => {
           </div>
         ) : (
           <EmptyState
-            title="No Service Requests Yet"
-            description="Post your first home project or repair request to receive free bids from certified local pros."
+            title="No Active Service Requests"
+            description={
+              bookings.length > 0
+                ? "Your confirmed requests are active under Accepted Offers above. Post a new request to get bids from certified pros."
+                : "Post your first home project or repair request to receive free bids from certified local pros."
+            }
             action={
               <Link to="/post-job">
                 <Button className="gap-2">
-                  <PlusCircle className="w-4 h-4" /> Post First Job
+                  <PlusCircle className="w-4 h-4" /> Post New Request
                 </Button>
               </Link>
             }

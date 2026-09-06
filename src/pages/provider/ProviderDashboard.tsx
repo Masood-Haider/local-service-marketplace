@@ -278,26 +278,26 @@ export const ProviderDashboard: React.FC = () => {
 
       {/* Stats row */}
       {(() => {
-        const pendingDirectCount = directQuotes.filter((q) => q.status === "pending").length
+        const pendingDirectQuotes = directQuotes.filter((q) => q.status === "pending")
 
         return (
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
-            <Card className={pendingDirectCount > 0 ? "border-primary/50 shadow-xs ring-1 ring-primary/20" : ""}>
+            <Card className={pendingDirectQuotes.length > 0 ? "border-primary/50 shadow-xs ring-1 ring-primary/20" : ""}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Direct Inquiries</CardTitle>
-                <Inbox className={`w-4 h-4 ${pendingDirectCount > 0 ? "text-primary animate-bounce" : "text-muted-foreground"}`} />
+                <CardTitle className="text-sm font-medium text-muted-foreground">Direct Requests</CardTitle>
+                <Inbox className={`w-4 h-4 ${pendingDirectQuotes.length > 0 ? "text-primary animate-bounce" : "text-muted-foreground"}`} />
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-2">
-                  <div className="text-2xl font-bold">{directQuotes.length}</div>
-                  {pendingDirectCount > 0 && (
+                  <div className="text-2xl font-bold">{pendingDirectQuotes.length}</div>
+                  {pendingDirectQuotes.length > 0 && (
                     <Badge className="bg-primary text-primary-foreground text-[10px] h-5 px-1.5 font-bold">
-                      {pendingDirectCount} New
+                      {pendingDirectQuotes.length} New
                     </Badge>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {pendingDirectCount > 0 ? `${pendingDirectCount} awaiting your response` : "Direct client offers"}
+                  {pendingDirectQuotes.length > 0 ? `${pendingDirectQuotes.length} awaiting response` : "Pending customer requests"}
                 </p>
               </CardContent>
             </Card>
@@ -317,7 +317,7 @@ export const ProviderDashboard: React.FC = () => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Booked Jobs</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Scheduled Jobs</CardTitle>
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               </CardHeader>
               <CardContent>
@@ -342,134 +342,114 @@ export const ProviderDashboard: React.FC = () => {
         )
       })()}
 
-      {/* Direct Client Offers & Quote Inquiries Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-xl font-bold text-foreground">Direct Client Offers & Quote Inquiries</h3>
-              {directQuotes.filter((q) => q.status === "pending").length > 0 && (
-                <Badge className="bg-primary text-primary-foreground text-xs font-bold animate-pulse">
-                  {directQuotes.filter((q) => q.status === "pending").length} Action Required
-                </Badge>
-              )}
+      {/* Direct Client Service Requests Section */}
+      {(() => {
+        const pendingDirectQuotes = directQuotes.filter((q) => q.status === "pending")
+
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-bold text-foreground">Direct Client Service Requests</h3>
+                  {pendingDirectQuotes.length > 0 && (
+                    <Badge className="bg-primary text-primary-foreground text-xs font-bold animate-pulse">
+                      {pendingDirectQuotes.length} Action Required
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Direct inquiries from clients awaiting your quote or schedule confirmation
+                </p>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                {pendingDirectQuotes.length} Pending
+              </Badge>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Customers who contacted you directly through your public profile page
-            </p>
-          </div>
-          <Badge variant="outline" className="text-xs">
-            {directQuotes.length} Total Offer{directQuotes.length === 1 ? "" : "s"}
-          </Badge>
-        </div>
 
-        {directQuotes.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {directQuotes.map((quote) => {
-              const isPending = quote.status === "pending"
-              const isAccepted = quote.status === "accepted"
-              const isDeclined = quote.status === "declined"
-
-              return (
-                <Card
-                  key={quote.id}
-                  className={`hover:shadow-md transition-all border flex flex-col justify-between ${
-                    isPending
-                      ? "border-primary/40 bg-primary/[0.02]"
-                      : isAccepted
-                      ? "border-emerald-500/30 bg-emerald-500/[0.02]"
-                      : "border-border opacity-70"
-                  }`}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <Badge variant="outline" className="text-[11px] font-semibold text-primary border-primary/30">
-                            {quote.serviceNeeded || "Custom Service"}
-                          </Badge>
-                          {isPending && (
+            {pendingDirectQuotes.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {pendingDirectQuotes.map((quote) => (
+                  <Card
+                    key={quote.id}
+                    className="hover:shadow-md transition-all border border-primary/40 bg-primary/[0.02] flex flex-col justify-between"
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <Badge variant="outline" className="text-[11px] font-semibold text-primary border-primary/30">
+                              {quote.serviceNeeded || "Custom Service"}
+                            </Badge>
                             <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[10px] gap-1">
                               <Clock className="w-3 h-3" /> Awaiting Response
                             </Badge>
-                          )}
-                          {isAccepted && (
-                            <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[10px] gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> Confirmed Booking
-                            </Badge>
-                          )}
-                          {isDeclined && (
-                            <Badge variant="secondary" className="text-[10px]">
-                              Declined
-                            </Badge>
-                          )}
+                          </div>
+                          <CardTitle className="text-lg font-bold leading-tight">
+                            Request from {quote.customerName}
+                          </CardTitle>
                         </div>
-                        <CardTitle className="text-lg font-bold leading-tight">
-                          Offer from {quote.customerName}
-                        </CardTitle>
+
+                        {quote.price && (
+                          <div className="text-right shrink-0">
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                              Rate
+                            </span>
+                            <span className="font-black text-sm text-emerald-600 dark:text-emerald-400">
+                              {quote.price}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="space-y-3 pt-0">
+                      <div className="p-3 rounded-lg bg-muted/40 border border-border/50 text-xs text-foreground/90 leading-relaxed">
+                        <p className="font-semibold text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
+                          Client Scope & Request:
+                        </p>
+                        {quote.projectDetails || "No additional project details provided."}
                       </div>
 
-                      {quote.price && (
-                        <div className="text-right shrink-0">
-                          <span className="text-[10px] uppercase font-bold text-muted-foreground block">
-                            Rate
-                          </span>
-                          <span className="font-black text-sm text-emerald-600 dark:text-emerald-400">
-                            {quote.price}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </CardHeader>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground pt-1 border-t border-border/60">
+                        <span className="flex items-center gap-1.5 truncate">
+                          <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
+                          {quote.serviceLocation || "Location on inquiry"}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-primary shrink-0" />
+                          {quote.preferredDate ? `Target Date: ${quote.preferredDate}` : "Flexible schedule"}
+                        </span>
+                      </div>
 
-                  <CardContent className="space-y-3 pt-0">
-                    <div className="p-3 rounded-lg bg-muted/40 border border-border/50 text-xs text-foreground/90 leading-relaxed">
-                      <p className="font-semibold text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
-                        Client Scope & Request:
-                      </p>
-                      {quote.projectDetails || "No additional project details provided."}
-                    </div>
+                      {/* Client Direct Contact details */}
+                      <div className="flex flex-wrap items-center gap-3 pt-2 text-xs">
+                        {quote.customerEmail && (
+                          <a
+                            href={`mailto:${quote.customerEmail}`}
+                            className="flex items-center gap-1 text-primary hover:underline"
+                          >
+                            <Mail className="w-3.5 h-3.5" /> {quote.customerEmail}
+                          </a>
+                        )}
+                        {quote.customerPhone && (
+                          <a
+                            href={`tel:${quote.customerPhone}`}
+                            className="flex items-center gap-1 text-primary hover:underline"
+                          >
+                            <Phone className="w-3.5 h-3.5" /> {quote.customerPhone}
+                          </a>
+                        )}
+                      </div>
+                    </CardContent>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground pt-1 border-t border-border/60">
-                      <span className="flex items-center gap-1.5 truncate">
-                        <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
-                        {quote.serviceLocation || "Location on inquiry"}
+                    <CardFooter className="border-t border-border/60 pt-3.5 flex items-center justify-between bg-muted/20">
+                      <span className="text-[11px] text-muted-foreground">
+                        {quote.createdAt?.toDate
+                          ? `Received ${quote.createdAt.toDate().toLocaleDateString()}`
+                          : "Direct request"}
                       </span>
-                      <span className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-primary shrink-0" />
-                        {quote.preferredDate ? `Target Date: ${quote.preferredDate}` : "Flexible schedule"}
-                      </span>
-                    </div>
 
-                    {/* Client Direct Contact details */}
-                    <div className="flex flex-wrap items-center gap-3 pt-2 text-xs">
-                      {quote.customerEmail && (
-                        <a
-                          href={`mailto:${quote.customerEmail}`}
-                          className="flex items-center gap-1 text-primary hover:underline"
-                        >
-                          <Mail className="w-3.5 h-3.5" /> {quote.customerEmail}
-                        </a>
-                      )}
-                      {quote.customerPhone && (
-                        <a
-                          href={`tel:${quote.customerPhone}`}
-                          className="flex items-center gap-1 text-primary hover:underline"
-                        >
-                          <Phone className="w-3.5 h-3.5" /> {quote.customerPhone}
-                        </a>
-                      )}
-                    </div>
-                  </CardContent>
-
-                  <CardFooter className="border-t border-border/60 pt-3.5 flex items-center justify-between bg-muted/20">
-                    <span className="text-[11px] text-muted-foreground">
-                      {quote.createdAt?.toDate
-                        ? `Received ${quote.createdAt.toDate().toLocaleDateString()}`
-                        : "Direct request"}
-                    </span>
-
-                    {isPending ? (
                       <div className="flex items-center gap-2">
                         <Button
                           size="sm"
@@ -487,42 +467,40 @@ export const ProviderDashboard: React.FC = () => {
                           <CheckCircle2 className="w-3.5 h-3.5" /> Accept & Schedule
                         </Button>
                       </div>
-                    ) : isAccepted ? (
-                      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 className="w-4 h-4" /> Active Client Booking
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Offer Declined</span>
-                    )}
-                  </CardFooter>
-                </Card>
-              )
-            })}
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={Inbox}
+                title="No Pending Direct Requests"
+                description={
+                  bookings.length > 0
+                    ? "Your accepted and confirmed client offers are active in Scheduled Jobs below. New incoming requests will appear here."
+                    : "When clients view your public profile and click 'Request a Quote', their direct requests will appear here immediately."
+                }
+                action={
+                  <Link to={`/providers/${currentUser?.uid}`}>
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      <Eye className="w-4 h-4 text-primary" /> View Your Public Profile
+                    </Button>
+                  </Link>
+                }
+              />
+            )}
           </div>
-        ) : (
-          <EmptyState
-            icon={Inbox}
-            title="No Direct Offers Yet"
-            description="When clients view your public profile and click 'Request a Quote', their direct project offers and contact information will appear here immediately."
-            action={
-              <Link to={`/providers/${currentUser?.uid}`}>
-                <Button variant="outline" size="sm" className="gap-1.5">
-                  <Eye className="w-4 h-4 text-primary" /> View Your Public Profile
-                </Button>
-              </Link>
-            }
-          />
-        )}
-      </div>
+        )
+      })()}
 
-      {/* Active Bookings Section */}
+      {/* Scheduled Appointments & Confirmed Jobs Section */}
       {bookings.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h3 className="text-xl font-bold text-foreground">Active Bookings & Dispatches</h3>
-              <Badge variant="outline" className="text-xs">
-                {bookings.length} Appointment{bookings.length === 1 ? "" : "s"}
+              <h3 className="text-xl font-bold text-foreground">Scheduled Appointments & Booked Jobs</h3>
+              <Badge variant="outline" className="text-xs font-semibold">
+                {bookings.length} Scheduled
               </Badge>
             </div>
             <Link to="/dashboard/provider/schedule">
@@ -548,14 +526,19 @@ export const ProviderDashboard: React.FC = () => {
                       </div>
                       <CardTitle className="text-base font-bold line-clamp-1">{booking.jobTitle}</CardTitle>
                     </div>
-                    <Badge className={statusInfo.className}>
-                      {statusInfo.label}
-                    </Badge>
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-semibold gap-1">
+                        <Calendar className="w-3 h-3" /> Scheduled
+                      </Badge>
+                      <Badge className={statusInfo.className}>
+                        {statusInfo.label}
+                      </Badge>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-2 pt-0 text-xs">
                     <div className="flex items-center justify-between py-1 border-b border-border/50">
                       <span className="text-muted-foreground flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-primary" /> {booking.scheduledDate}
+                        <Calendar className="w-3.5 h-3.5 text-primary" /> {booking.scheduledDate} {booking.scheduledTime && `(${booking.scheduledTime})`}
                       </span>
                       <span className="font-bold text-foreground">{booking.price}</span>
                     </div>
@@ -604,14 +587,14 @@ export const ProviderDashboard: React.FC = () => {
               </Button>
             )}
             <Badge variant="outline" className="text-xs ml-1">
-              {openJobs.length} Job{openJobs.length === 1 ? "" : "s"}
+              {openJobs.filter((j) => j.status === "open").length} Job{openJobs.filter((j) => j.status === "open").length === 1 ? "" : "s"}
             </Badge>
           </div>
         </div>
 
-        {openJobs.length > 0 ? (
+        {openJobs.filter((j) => j.status === "open").length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {openJobs.map((job) => (
+            {openJobs.filter((j) => j.status === "open").map((job) => (
               <Card key={job.id} className="hover:shadow-md transition-shadow border-border flex flex-col justify-between">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
