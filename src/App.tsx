@@ -17,6 +17,7 @@ import { Register } from "@/pages/Register"
 import { BrowseProviders } from "@/pages/BrowseProviders"
 import { ProviderDetail } from "@/pages/ProviderDetail"
 import { PostJob } from "@/pages/PostJob"
+import { ChooseRole } from "@/pages/ChooseRole"
 
 // Customer Dashboard Pages
 import { CustomerDashboard } from "@/pages/customer/CustomerDashboard"
@@ -52,6 +53,7 @@ export function App() {
               <Route path="/providers/:id" element={<ProviderDetail />} />
               <Route path="/post-job" element={<PostJob />} />
               <Route path="/jobs/:jobId" element={<JobDetail />} />
+              <Route path="/choose-role" element={<ChooseRole />} />
             </Route>
 
             {/* Customer Dashboard (Protected: Customer & Admin) */}

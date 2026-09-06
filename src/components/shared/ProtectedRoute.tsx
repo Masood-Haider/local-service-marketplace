@@ -31,6 +31,21 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
+  // If user is authenticated but has not selected a role yet (e.g. first-time Google sign-in)
+  if (!role) {
+    if (location.pathname !== "/choose-role") {
+      return <Navigate to="/choose-role" replace />
+    }
+    return children ? <>{children}</> : <Outlet />
+  }
+
+  // If role is set and user tries to access /choose-role, redirect to their home portal
+  if (location.pathname === "/choose-role") {
+    if (role === "admin") return <Navigate to="/admin" replace />
+    if (role === "provider") return <Navigate to="/dashboard/provider" replace />
+    return <Navigate to="/dashboard/customer" replace />
+  }
+
   // Check role permissions (if specified)
   if (allowedRoles && allowedRoles.length > 0) {
     // Admin has universal access
