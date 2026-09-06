@@ -1,35 +1,76 @@
 import React, { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
+import { toast } from "sonner"
 import { useAuth } from "@/hooks/useAuth"
 import {
   listenToCustomerJobs,
   listenToCustomerBookings,
+  listenToJobQuotes,
+  acceptJobQuoteWithSlot,
+  declineJobQuote,
   getBookingStatusBadge,
   Job,
+  JobQuote,
   Booking,
 } from "@/services/jobService"
 import { PageHeader } from "@/components/shared/PageHeader"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { EmptyState } from "@/components/shared/EmptyState"
 import {
-  Calendar,
+  Calendar as CalendarIcon,
   PlusCircle,
   Clock,
   CheckCircle2,
+  XCircle,
   ArrowRight,
   MapPin,
-  Briefcase,
   Loader2,
+  ShieldCheck,
+  Sparkles,
+  ChevronDown,
+  Tag,
 } from "lucide-react"
+
+const timeSlots = [
+  "08:00 AM - 10:00 AM (Morning)",
+  "10:00 AM - 12:00 PM (Late Morning)",
+  "12:00 PM - 02:00 PM (Early Afternoon)",
+  "02:00 PM - 04:00 PM (Afternoon)",
+  "04:00 PM - 06:00 PM (Evening)",
+]
 
 export const CustomerDashboard: React.FC = () => {
   const { currentUser } = useAuth()
   const [jobs, setJobs] = useState<Job[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
+  const [quotesByJob, setQuotesByJob] = useState<Record<string, JobQuote[]>>({})
   const [loading, setLoading] = useState(true)
 
+  // Scheduling Dialog state for accepting a quote
+  const [schedulingTarget, setSchedulingTarget] = useState<{ job: Job; quote: JobQuote } | null>(null)
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    return d
+  })
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState("10:00 AM - 12:00 PM")
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const [bookingInProgress, setBookingInProgress] = useState(false)
+
+  // Listen to customer jobs & bookings
   useEffect(() => {
     if (!currentUser?.uid) return
 
@@ -48,7 +89,111 @@ export const CustomerDashboard: React.FC = () => {
     }
   }, [currentUser?.uid])
 
+  // Listen to quotes for all open jobs
+  useEffect(() => {
+    const openJobs = jobs.filter((j) => j.status === "open")
+    if (openJobs.length === 0) {
+      setQuotesByJob({})
+      return
+    }
+
+    const unsubs: (() => void)[] = []
+    openJobs.forEach((job) => {
+      const unsub = listenToJobQuotes(job.id, (quotes) => {
+        setQuotesByJob((prev) => ({
+          ...prev,
+          [job.id]: quotes,
+        }))
+      })
+      unsubs.push(unsub)
+    })
+
+    return () => {
+      unsubs.forEach((u) => u())
+    }
+  }, [jobs])
+
   const openJobs = jobs.filter((j) => j.status === "open")
+
+  // Flatten pending quotes with their parent job attached
+  const pendingQuotesList = Object.entries(quotesByJob).flatMap(([jobId, quotes]) => {
+    const targetJob = jobs.find((j) => j.id === jobId)
+    if (!targetJob || targetJob.status !== "open") return []
+    return quotes
+      .filter((q) => !q.status || q.status === "pending")
+      .map((q) => ({ quote: q, job: targetJob }))
+  })
+
+  const handleStartSchedule = (job: Job, quote: JobQuote) => {
+    setSchedulingTarget({ job, quote })
+  }
+
+  const handleDeclineQuote = async (job: Job, quote: JobQuote) => {
+    if (!window.confirm(`Are you sure you want to decline the quote of ${quote.price} from ${quote.providerName}?`)) {
+      return
+    }
+    try {
+      await declineJobQuote(job.id, quote)
+      toast.success("Quote declined", {
+        description: `You declined the quote from ${quote.providerName}.`,
+      })
+    } catch (err: any) {
+      console.error("Failed to decline quote:", err)
+      toast.error("Failed to decline quote", { description: err.message })
+    }
+  }
+
+  const handleConfirmBookingWithSlot = async () => {
+    if (!schedulingTarget) return
+    const { job, quote } = schedulingTarget
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const selectedNormalized = new Date(selectedDate)
+    selectedNormalized.setHours(0, 0, 0, 0)
+
+    if (selectedNormalized < today) {
+      toast.error("Invalid booking date", {
+        description: "You cannot schedule an appointment for a date in the past.",
+      })
+      return
+    }
+
+    setBookingInProgress(true)
+    try {
+      const formattedDate = selectedDate.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+
+      await acceptJobQuoteWithSlot(job, quote, {
+        scheduledDate: formattedDate,
+        scheduledTime: selectedTimeSlot,
+      })
+
+      toast.success("Appointment Booked Successfully!", {
+        description: `Scheduled with ${quote.providerName} for ${formattedDate} (${selectedTimeSlot}).`,
+      })
+      setSchedulingTarget(null)
+    } catch (err: any) {
+      toast.error("Failed to book appointment", {
+        description: err.message || "An error occurred while booking.",
+      })
+    } finally {
+      setBookingInProgress(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="py-20 flex flex-col items-center justify-center space-y-3">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-sm font-medium text-muted-foreground">Loading dashboard...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8 pb-12">
@@ -66,15 +211,33 @@ export const CustomerDashboard: React.FC = () => {
       />
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Active Bookings</CardTitle>
-            <Calendar className="w-4 h-4 text-emerald-500" />
+            <CalendarIcon className="w-4 h-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{bookings.length}</div>
             <p className="text-xs text-muted-foreground mt-1">Confirmed appointments</p>
+          </CardContent>
+        </Card>
+
+        <Card className={pendingQuotesList.length > 0 ? "border-primary/50 bg-primary/5" : ""}>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-foreground">Incoming Pro Bids</CardTitle>
+            <Tag className="w-4 h-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-bold text-primary">{pendingQuotesList.length}</span>
+              {pendingQuotesList.length > 0 && (
+                <Badge className="bg-emerald-500 hover:bg-emerald-600 text-[10px] text-white">
+                  Action Required
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Quotes awaiting decision</p>
           </CardContent>
         </Card>
 
@@ -100,6 +263,95 @@ export const CustomerDashboard: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Prominent Incoming Pro Quotes & Proposals Section */}
+      {pendingQuotesList.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <h3 className="text-xl font-bold text-foreground">Incoming Pro Quotes & Proposals</h3>
+              <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs">
+                {pendingQuotesList.length} Awaiting Review
+              </Badge>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {pendingQuotesList.map(({ quote, job }) => (
+              <Card key={quote.id} className="border-primary/40 shadow-sm hover:shadow-md transition-all flex flex-col justify-between bg-card">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-11 w-11 border border-border">
+                        <AvatarImage src={quote.providerPhotoURL || undefined} alt={quote.providerName} />
+                        <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                          {quote.providerName.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-base text-foreground leading-none">{quote.providerName}</h4>
+                          <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-emerald-500/30 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30">
+                            <ShieldCheck className="w-2.5 h-2.5 mr-0.5 inline" /> Certified Pro
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                          For request:{" "}
+                          <Link to={`/dashboard/customer/jobs/${job.id}`} className="font-medium text-foreground hover:underline truncate max-w-[160px] sm:max-w-[200px]">
+                            {job.title}
+                          </Link>
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">Offered Price</span>
+                      <span className="text-xl font-black text-primary">{quote.price}</span>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-3 pt-0">
+                  <div className="p-3 rounded-lg bg-muted/50 border border-border/60 text-xs text-foreground/90 italic">
+                    "{quote.message}"
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-primary" /> {job.location}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <CalendarIcon className="w-3.5 h-3.5 text-primary" /> Preferred: {job.preferredDate}
+                    </span>
+                  </div>
+                </CardContent>
+
+                <CardFooter className="border-t border-border/60 pt-3 flex items-center gap-2 bg-muted/20">
+                  <Button
+                    size="sm"
+                    className="flex-1 gap-1.5 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
+                    onClick={() => handleStartSchedule(job, quote)}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Accept & Schedule
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs text-destructive hover:bg-destructive/10 border-destructive/30"
+                    onClick={() => handleDeclineQuote(job, quote)}
+                  >
+                    <XCircle className="w-3.5 h-3.5 mr-1" /> Decline
+                  </Button>
+                  <Link to={`/dashboard/customer/jobs/${job.id}`}>
+                    <Button size="sm" variant="ghost" className="text-xs px-2.5">
+                      Details
+                    </Button>
+                  </Link>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Upcoming Confirmed Bookings Section */}
       {bookings.length > 0 && (
@@ -141,7 +393,7 @@ export const CustomerDashboard: React.FC = () => {
                   <CardContent className="space-y-2 pt-0 text-xs">
                     <div className="flex items-center justify-between py-1 border-b border-border/50">
                       <span className="text-muted-foreground flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-primary" /> {booking.scheduledDate} {booking.scheduledTime && `(${booking.scheduledTime})`}
+                        <CalendarIcon className="w-3.5 h-3.5 text-primary" /> {booking.scheduledDate} {booking.scheduledTime && `(${booking.scheduledTime})`}
                       </span>
                       <span className="font-bold text-foreground">{booking.price}</span>
                     </div>
@@ -184,13 +436,14 @@ export const CustomerDashboard: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {jobs.map((job) => {
               const isBooked = job.status === "booked"
+              const jobQuotes = (quotesByJob[job.id] || []).filter((q) => !q.status || q.status === "pending")
 
               return (
                 <Card key={job.id} className="hover:shadow-md transition-shadow border-border flex flex-col justify-between">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <div className="flex items-center gap-2 mb-1.5">
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                           <Badge
                             variant={isBooked ? "default" : "secondary"}
                             className={`text-[10px] uppercase font-bold ${
@@ -202,6 +455,11 @@ export const CustomerDashboard: React.FC = () => {
                           <Badge variant="outline" className="text-[10px] font-semibold text-primary border-primary/30">
                             {job.category}
                           </Badge>
+                          {!isBooked && jobQuotes.length > 0 && (
+                            <Badge className="bg-emerald-500 text-white text-[10px] font-bold">
+                              {jobQuotes.length} Quote{jobQuotes.length === 1 ? "" : "s"} Received
+                            </Badge>
+                          )}
                         </div>
                         <CardTitle className="text-lg font-bold leading-tight line-clamp-1">{job.title}</CardTitle>
                       </div>
@@ -225,14 +483,14 @@ export const CustomerDashboard: React.FC = () => {
                         <MapPin className="w-3.5 h-3.5 text-primary shrink-0" /> {job.location}
                       </span>
                       <span className="flex items-center gap-1.5 shrink-0">
-                        <Calendar className="w-3.5 h-3.5 text-primary" /> {job.preferredDate}
+                        <CalendarIcon className="w-3.5 h-3.5 text-primary" /> {job.preferredDate}
                       </span>
                     </div>
                   </CardContent>
 
                   <CardFooter className="border-t border-border/60 pt-3.5 flex items-center justify-between bg-muted/20">
                     <span className="text-xs text-muted-foreground">
-                      {isBooked ? "Provider confirmed" : "Quotes appear in real-time"}
+                      {isBooked ? "Provider confirmed" : jobQuotes.length > 0 ? `${jobQuotes.length} quote(s) pending your review` : "Awaiting provider proposals"}
                     </span>
                     <Link to={`/dashboard/customer/jobs/${job.id}`}>
                       <Button size="sm" className="gap-1.5 text-xs h-8">
@@ -258,6 +516,120 @@ export const CustomerDashboard: React.FC = () => {
           />
         )}
       </div>
+
+      {/* Booking Slot Selection Modal */}
+      <Dialog
+        open={!!schedulingTarget}
+        onOpenChange={(open) => {
+          if (!open) setSchedulingTarget(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <Sparkles className="w-5 h-5 text-primary" />
+              Book Appointment with {schedulingTarget?.quote.providerName}
+            </DialogTitle>
+            <DialogDescription>
+              Select your preferred service date and arrival window to confirm this booking for{" "}
+              <strong className="text-foreground">{schedulingTarget?.quote.price}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* 1. Date Selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-foreground">
+                1. Select Service Date *
+              </label>
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between text-left font-normal h-11 border-border"
+                  >
+                    <span className="flex items-center gap-2">
+                      <CalendarIcon className="w-4 h-4 text-primary" />
+                      <span className="font-semibold text-foreground">
+                        {selectedDate.toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </span>
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-muted-foreground opacity-60" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    selected={selectedDate}
+                    minDate={new Date()}
+                    onSelect={(d) => {
+                      setSelectedDate(d)
+                      setCalendarOpen(false)
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* 2. Time Slot Selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-foreground">
+                2. Select Arrival Time Window *
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {timeSlots.map((slot) => (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => setSelectedTimeSlot(slot)}
+                    className={`p-2.5 rounded-lg border text-xs font-semibold text-left transition-all flex items-center justify-between ${
+                      selectedTimeSlot === slot
+                        ? "border-primary bg-primary/10 text-primary ring-1 ring-primary"
+                        : "border-border hover:bg-muted text-foreground"
+                    }`}
+                  >
+                    <span>{slot}</span>
+                    {selectedTimeSlot === slot && <CheckCircle2 className="w-3.5 h-3.5" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Summary Banner */}
+            <div className="p-3.5 rounded-xl bg-muted/50 border border-border text-xs space-y-1">
+              <p className="text-foreground">
+                <strong>Appointment Address:</strong> {schedulingTarget?.job.location}
+              </p>
+              <p className="text-muted-foreground">
+                The provider will arrive within your chosen time window and invoice the agreed price of{" "}
+                <strong className="text-foreground">{schedulingTarget?.quote.price}</strong> upon completion.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              className="w-full h-11 gap-2 font-semibold"
+              onClick={handleConfirmBookingWithSlot}
+              disabled={bookingInProgress}
+            >
+              {bookingInProgress ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Confirming Booking...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" /> Confirm & Book Appointment
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

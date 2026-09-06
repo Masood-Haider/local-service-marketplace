@@ -348,6 +348,34 @@ export async function acceptJobQuoteWithSlot(
 }
 
 /**
+ * Declines/rejects a provider's quote on a job:
+ * 1. Updates quote status to "declined" in jobs/{jobId}/quotes/{quoteId}
+ * 2. Notifies the provider that their quote was declined
+ */
+export async function declineJobQuote(
+  jobId: string,
+  quote: JobQuote
+): Promise<void> {
+  const quoteRef = doc(db, "jobs", jobId, "quotes", quote.id)
+  await updateDoc(quoteRef, {
+    status: "declined",
+    updatedAt: serverTimestamp(),
+  })
+
+  try {
+    const jobSnap = await getDoc(doc(db, "jobs", jobId))
+    const jobTitle = jobSnap.exists() ? (jobSnap.data() as any).title : "job request"
+    await createNotification({
+      userId: quote.providerId,
+      message: `Your quote (${quote.price}) for "${jobTitle}" was declined by the customer.`,
+      type: "general",
+    })
+  } catch (err) {
+    console.warn("Failed to notify provider of declined quote:", err)
+  }
+}
+
+/**
  * Legacy wrapper for backward compatibility
  */
 export async function acceptJobQuote(job: Job, quote: JobQuote): Promise<string> {

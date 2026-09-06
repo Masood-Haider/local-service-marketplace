@@ -6,6 +6,7 @@ import {
   listenToJob,
   listenToJobQuotes,
   acceptJobQuoteWithSlot,
+  declineJobQuote,
   Job,
   JobQuote,
 } from "@/services/jobService"
@@ -93,6 +94,22 @@ export const JobDetail: React.FC = () => {
 
   const handleStartSchedule = (quote: JobQuote) => {
     setSchedulingQuote(quote)
+  }
+
+  const handleDeclineQuote = async (quote: JobQuote) => {
+    if (!job) return
+    if (!window.confirm(`Are you sure you want to decline the quote of ${quote.price} from ${quote.providerName}?`)) {
+      return
+    }
+    try {
+      await declineJobQuote(job.id, quote)
+      toast.success("Quote declined", {
+        description: `You declined the quote from ${quote.providerName}.`,
+      })
+    } catch (err: any) {
+      console.error("Failed to decline quote:", err)
+      toast.error("Failed to decline quote", { description: err.message })
+    }
   }
 
   const handleConfirmBookingWithSlot = async () => {
@@ -330,13 +347,32 @@ export const JobDetail: React.FC = () => {
                     </span>
 
                     {!isBooked && (
-                      <Button
-                        size="sm"
-                        className="gap-1.5 font-semibold px-5 shadow-xs"
-                        onClick={() => handleStartSchedule(quote)}
-                      >
-                        <CalendarIcon className="w-4 h-4" /> Accept & Schedule Slot
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {quote.status !== "declined" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+                            onClick={() => handleDeclineQuote(quote)}
+                          >
+                            Decline
+                          </Button>
+                        )}
+                        {quote.status !== "declined" && (
+                          <Button
+                            size="sm"
+                            className="gap-1.5 font-semibold px-5 shadow-xs"
+                            onClick={() => handleStartSchedule(quote)}
+                          >
+                            <CalendarIcon className="w-4 h-4" /> Accept & Schedule Slot
+                          </Button>
+                        )}
+                        {quote.status === "declined" && (
+                          <Badge variant="secondary" className="text-xs">
+                            Declined
+                          </Badge>
+                        )}
+                      </div>
                     )}
 
                     {isAccepted && (
