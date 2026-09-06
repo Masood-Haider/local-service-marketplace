@@ -47,12 +47,27 @@ export const PostJob: React.FC = () => {
     "Handyman",
   ]
 
+  const todayDateString = React.useMemo(() => {
+    const today = new Date()
+    const y = today.getFullYear()
+    const m = String(today.getMonth() + 1).padStart(2, "0")
+    const d = String(today.getDate()).padStart(2, "0")
+    return `${y}-${m}-${d}`
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!title.trim() || !description.trim() || !location.trim()) {
       toast.error("Required fields missing", {
         description: "Please provide a title, location, and project description.",
+      })
+      return
+    }
+
+    if (preferredDate && preferredDate < todayDateString) {
+      toast.error("Invalid preferred date", {
+        description: "Please select a preferred service date today or in the future.",
       })
       return
     }
@@ -168,6 +183,7 @@ export const PostJob: React.FC = () => {
                   <Input
                     id="job-date"
                     type="date"
+                    min={todayDateString}
                     value={preferredDate}
                     onChange={(e) => setPreferredDate(e.target.value)}
                     className="pl-9"

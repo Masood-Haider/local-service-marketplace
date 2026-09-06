@@ -106,12 +106,27 @@ export const ProviderDetail: React.FC = () => {
     loadProvider()
   }, [id])
 
+  const todayDateString = React.useMemo(() => {
+    const today = new Date()
+    const y = today.getFullYear()
+    const m = String(today.getMonth() + 1).padStart(2, "0")
+    const d = String(today.getDate()).padStart(2, "0")
+    return `${y}-${m}-${d}`
+  }, [])
+
   const handleQuoteSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!id || !provider) return
 
     if (!customerName || !customerEmail || !serviceNeeded || !serviceLocation) {
       toast.error("Please fill in all required quote request fields")
+      return
+    }
+
+    if (preferredDate && preferredDate < todayDateString) {
+      toast.error("Invalid preferred date", {
+        description: "Please select a date today or in the future.",
+      })
       return
     }
 
@@ -289,6 +304,7 @@ export const ProviderDetail: React.FC = () => {
                     </label>
                     <Input
                       type="date"
+                      min={todayDateString}
                       value={preferredDate}
                       onChange={(e) => setPreferredDate(e.target.value)}
                     />

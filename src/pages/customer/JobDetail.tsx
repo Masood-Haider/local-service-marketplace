@@ -98,6 +98,19 @@ export const JobDetail: React.FC = () => {
   const handleConfirmBookingWithSlot = async () => {
     if (!job || !schedulingQuote) return
 
+    // Prevent booking dates in the past
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const selectedNormalized = new Date(selectedDate)
+    selectedNormalized.setHours(0, 0, 0, 0)
+
+    if (selectedNormalized < today) {
+      toast.error("Invalid booking date", {
+        description: "You cannot schedule an appointment for a date in the past.",
+      })
+      return
+    }
+
     setBookingInProgress(true)
     try {
       const formattedDate = selectedDate.toLocaleDateString("en-US", {
@@ -388,6 +401,7 @@ export const JobDetail: React.FC = () => {
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     selected={selectedDate}
+                    minDate={new Date()}
                     onSelect={(d) => {
                       setSelectedDate(d)
                       setCalendarOpen(false)

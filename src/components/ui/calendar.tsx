@@ -16,8 +16,21 @@ export const Calendar: React.FC<CalendarProps> = ({
   className,
   minDate = new Date(),
 }) => {
+  const effectiveMinDate = React.useMemo(() => {
+    if (!minDate) return null
+    const d = new Date(minDate)
+    d.setHours(0, 0, 0, 0)
+    return d
+  }, [minDate])
+
   const [currentMonth, setCurrentMonth] = React.useState(() => {
-    return selected ? new Date(selected.getFullYear(), selected.getMonth(), 1) : new Date()
+    if (selected) {
+      return new Date(selected.getFullYear(), selected.getMonth(), 1)
+    }
+    if (effectiveMinDate) {
+      return new Date(effectiveMinDate.getFullYear(), effectiveMinDate.getMonth(), 1)
+    }
+    return new Date()
   })
 
   const year = currentMonth.getFullYear()
@@ -31,7 +44,23 @@ export const Calendar: React.FC<CalendarProps> = ({
     "July", "August", "September", "October", "November", "December"
   ]
 
+  const canGoPrev = React.useMemo(() => {
+    if (!effectiveMinDate) return true
+    const currentMonthStart = new Date(year, month, 1, 0, 0, 0, 0)
+    const minMonthStart = new Date(
+      effectiveMinDate.getFullYear(),
+      effectiveMinDate.getMonth(),
+      1,
+      0,
+      0,
+      0,
+      0
+    )
+    return currentMonthStart > minMonthStart
+  }, [year, month, effectiveMinDate])
+
   const prevMonth = () => {
+    if (!canGoPrev) return
     setCurrentMonth(new Date(year, month - 1, 1))
   }
 
@@ -58,10 +87,9 @@ export const Calendar: React.FC<CalendarProps> = ({
   }
 
   const isPast = (day: number) => {
-    const date = new Date(year, month, day)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    return date < today
+    if (!effectiveMinDate) return false
+    const date = new Date(year, month, day, 0, 0, 0, 0)
+    return date < effectiveMinDate
   }
 
   const handleSelectDay = (day: number) => {
@@ -84,8 +112,10 @@ export const Calendar: React.FC<CalendarProps> = ({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-7 w-7 disabled:opacity-20 disabled:cursor-not-allowed"
             onClick={prevMonth}
+            disabled={!canGoPrev}
+            aria-label="Previous month"
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
@@ -95,6 +125,7 @@ export const Calendar: React.FC<CalendarProps> = ({
             size="icon"
             className="h-7 w-7"
             onClick={nextMonth}
+            aria-label="Next month"
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
@@ -130,11 +161,12 @@ export const Calendar: React.FC<CalendarProps> = ({
               onClick={() => handleSelectDay(day)}
               className={cn(
                 "h-8 w-8 mx-auto rounded-lg text-xs font-medium transition-all flex items-center justify-center",
-                past && "text-muted-foreground/40 cursor-not-allowed",
+                past && "text-muted-foreground/30 line-through cursor-not-allowed pointer-events-none opacity-40 select-none",
                 !past && !selectedDay && "hover:bg-accent text-foreground hover:text-accent-foreground cursor-pointer",
                 today && !selectedDay && "border border-primary/40 font-bold text-primary",
                 selectedDay && "bg-primary text-primary-foreground font-bold shadow-xs scale-105"
               )}
+              aria-disabled={past}
             >
               {day}
             </button>
