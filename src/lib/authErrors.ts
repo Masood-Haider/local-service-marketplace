@@ -28,11 +28,15 @@ export function getFirebaseAuthErrorMessage(error: any): string {
       return "Sign-in popup was cancelled because another request was made."
     case "auth/popup-blocked":
       return "The Google sign-in popup was blocked by your browser. Please enable popups for this site."
-    case "auth/account-exists-with-different-credential":
-      return "An account already exists with this email using a different sign-in method. Please sign in with your original method."
     case "auth/unauthorized-domain":
       return "This domain is not authorized in Firebase for Google Sign-In. Please add your current domain (e.g. localhost or 127.0.0.1) in Firebase Console under Authentication > Settings > Authorized domains."
+    case "permission-denied":
+      return "Database write rejected. Make sure Cloud Firestore is created and rules are published in Firebase Console."
+    case "unavailable":
+      return "Database is currently unavailable. Ensure Cloud Firestore is created in Firebase Console."
+    case "failed-precondition":
+      return "Database setup required. Please make sure Cloud Firestore has been created in Firebase Console."
     default:
-      return error.message || "Authentication failed. Please try again."
+      return error.code ? `[${error.code}] ${error.message || "Operation failed."}` : (error.message || "Authentication failed. Please try again.")
   }
 }

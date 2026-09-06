@@ -83,6 +83,7 @@ export const Register: React.FC = () => {
         navigate("/dashboard/customer", { replace: true })
       }
     } catch (err: any) {
+      console.error("[Registration Error]", err)
       const message = getFirebaseAuthErrorMessage(err)
       toast.error("Registration failed", {
         description: message,
@@ -114,6 +115,7 @@ export const Register: React.FC = () => {
         navigate("/dashboard/customer", { replace: true })
       }
     } catch (err: any) {
+      console.error("[Google Registration Error]", err)
       const message = getFirebaseAuthErrorMessage(err)
       toast.error("Google Registration failed", {
         description: message,
