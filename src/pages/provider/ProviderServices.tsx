@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { EmptyState } from "@/components/shared/EmptyState"
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 import {
   PlusCircle,
   Wrench,
@@ -63,6 +64,8 @@ export const ProviderServices: React.FC = () => {
   const [serviceRateType, setServiceRateType] = useState("Standard")
   const [serviceDescription, setServiceDescription] = useState("")
   const [savingService, setSavingService] = useState(false)
+  const [serviceToDelete, setServiceToDelete] = useState<ProviderServiceItem | null>(null)
+  const [deletingService, setDeletingService] = useState(false)
 
   // Load provider profile
   useEffect(() => {
@@ -196,23 +199,25 @@ export const ProviderServices: React.FC = () => {
     }
   }
 
-  // Delete Service item
-  const handleDeleteService = async (id: string, name: string) => {
-    if (!currentUser?.uid) return
-    if (!window.confirm(`Are you sure you want to delete "${name}" from your services?`)) {
-      return
-    }
+  // Delete Service item via confirmation dialog
+  const handleConfirmDeleteService = async () => {
+    if (!currentUser?.uid || !serviceToDelete) return
+    setDeletingService(true)
+    const itemToDelete = serviceToDelete
+    const updatedList = services.filter((s) => s.id !== itemToDelete.id)
 
-    const updatedList = services.filter((s) => s.id !== id)
     try {
       await saveProviderServices(currentUser.uid, updatedList)
       setServices(updatedList)
       toast.success("Service removed", {
-        description: `"${name}" was deleted from your pricing matrix.`,
+        description: `"${itemToDelete.name}" was deleted from your pricing matrix.`,
       })
+      setServiceToDelete(null)
     } catch (err: any) {
       console.error("Error deleting service:", err)
       toast.error("Could not delete service", { description: err.message })
+    } finally {
+      setDeletingService(false)
     }
   }
 
@@ -340,7 +345,7 @@ export const ProviderServices: React.FC = () => {
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => handleDeleteService(item.id, item.name)}
+                        onClick={() => setServiceToDelete(item)}
                         title="Delete Service"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -479,6 +484,23 @@ export const ProviderServices: React.FC = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Service Confirmation Popup */}
+      <ConfirmDialog
+        open={serviceToDelete !== null}
+        onOpenChange={(open) => !open && setServiceToDelete(null)}
+        title="Delete Service Package?"
+        description={
+          <>
+            Are you sure you want to delete <strong>"{serviceToDelete?.name}"</strong> from your service packages? This item and its pricing will be permanently removed from your public profile.
+          </>
+        }
+        confirmLabel="Delete Package"
+        variant="destructive"
+        icon="danger"
+        isLoading={deletingService}
+        onConfirm={handleConfirmDeleteService}
+      />
     </div>
   )
 }

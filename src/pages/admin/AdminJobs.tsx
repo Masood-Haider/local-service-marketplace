@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { EmptyState } from "@/components/shared/EmptyState"
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 import {
   Briefcase,
   CalendarCheck,
@@ -67,6 +68,28 @@ export const AdminJobs: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("")
   const [bookingStatusFilter, setBookingStatusFilter] = useState("all")
   const [updatingBookingId, setUpdatingBookingId] = useState<string | null>(null)
+  const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null)
+  const [cancellingBooking, setCancellingBooking] = useState(false)
+
+  const handleConfirmCancelBooking = async () => {
+    if (!bookingToCancel) return
+    const booking = bookingToCancel
+    setCancellingBooking(true)
+    try {
+      await adminOverrideBookingStatus(booking.id, "cancelled")
+      setBookings((prev) =>
+        prev.map((b) => (b.id === booking.id ? { ...b, status: "cancelled" } : b))
+      )
+      toast.success("Appointment cancelled by Admin", {
+        description: `Booking for "${booking.jobTitle}" has been marked as cancelled. Participants notified.`,
+      })
+      setBookingToCancel(null)
+    } catch (err: any) {
+      toast.error("Failed to cancel appointment", { description: err.message })
+    } finally {
+      setCancellingBooking(false)
+    }
+  }
 
   const loadData = async () => {
     setLoading(true)
@@ -273,53 +296,66 @@ export const AdminJobs: React.FC = () => {
                             </TableCell>
 
                             <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
+                              <div className="flex items-center justify-end gap-1.5">
+                                {booking.status !== "cancelled" && booking.status !== "completed" && (
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-7 text-xs gap-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-                                    disabled={updatingBookingId === booking.id}
+                                    className="h-7 text-xs gap-1 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                    onClick={() => setBookingToCancel(booking)}
+                                    disabled={updatingBookingId === booking.id || (cancellingBooking && bookingToCancel?.id === booking.id)}
                                   >
-                                    Override <MoreVertical className="w-3 h-3" />
+                                    <XCircle className="w-3 h-3" /> Cancel
                                   </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 shadow-md">
-                                  <DropdownMenuLabel className="text-xs text-slate-500 dark:text-slate-400">
-                                    Override Booking Status
-                                  </DropdownMenuLabel>
-                                  <DropdownMenuSeparator className="bg-slate-100 dark:bg-slate-800" />
-                                  <DropdownMenuItem
-                                    onClick={() => handleOverrideStatus(booking.id, "confirmed")}
-                                    className="cursor-pointer text-xs focus:bg-slate-100 dark:focus:bg-slate-800"
-                                  >
-                                    <CheckCircle2 className="w-3.5 h-3.5 mr-2 text-blue-500" />
-                                    Mark Confirmed
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleOverrideStatus(booking.id, "in_progress")}
-                                    className="cursor-pointer text-xs focus:bg-slate-100 dark:focus:bg-slate-800"
-                                  >
-                                    <PlayCircle className="w-3.5 h-3.5 mr-2 text-purple-500" />
-                                    Mark In Progress
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleOverrideStatus(booking.id, "completed")}
-                                    className="cursor-pointer text-xs text-emerald-600 dark:text-emerald-400 font-semibold focus:bg-slate-100 dark:focus:bg-slate-800"
-                                  >
-                                    <CheckCheck className="w-3.5 h-3.5 mr-2 text-emerald-500" />
-                                    Mark Completed
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator className="bg-slate-100 dark:bg-slate-800" />
-                                  <DropdownMenuItem
-                                    onClick={() => handleOverrideStatus(booking.id, "cancelled")}
-                                    className="cursor-pointer text-xs text-rose-600 dark:text-rose-400 font-semibold focus:bg-slate-100 dark:focus:bg-slate-800"
-                                  >
-                                    <XCircle className="w-3.5 h-3.5 mr-2 text-rose-500" />
-                                    Mark Cancelled
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                                )}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 text-xs gap-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                      disabled={updatingBookingId === booking.id}
+                                    >
+                                      Override <MoreVertical className="w-3 h-3" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 shadow-md">
+                                    <DropdownMenuLabel className="text-xs text-slate-500 dark:text-slate-400">
+                                      Override Booking Status
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator className="bg-slate-100 dark:bg-slate-800" />
+                                    <DropdownMenuItem
+                                      onClick={() => handleOverrideStatus(booking.id, "confirmed")}
+                                      className="cursor-pointer text-xs focus:bg-slate-100 dark:focus:bg-slate-800"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5 mr-2 text-blue-500" />
+                                      Mark Confirmed
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleOverrideStatus(booking.id, "in_progress")}
+                                      className="cursor-pointer text-xs focus:bg-slate-100 dark:focus:bg-slate-800"
+                                    >
+                                      <PlayCircle className="w-3.5 h-3.5 mr-2 text-purple-500" />
+                                      Mark In Progress
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleOverrideStatus(booking.id, "completed")}
+                                      className="cursor-pointer text-xs text-emerald-600 dark:text-emerald-400 font-semibold focus:bg-slate-100 dark:focus:bg-slate-800"
+                                    >
+                                      <CheckCheck className="w-3.5 h-3.5 mr-2 text-emerald-500" />
+                                      Mark Completed
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator className="bg-slate-100 dark:bg-slate-800" />
+                                    <DropdownMenuItem
+                                      onClick={() => setBookingToCancel(booking)}
+                                      className="cursor-pointer text-xs text-rose-600 dark:text-rose-400 font-semibold focus:bg-slate-100 dark:focus:bg-slate-800"
+                                    >
+                                      <XCircle className="w-3.5 h-3.5 mr-2 text-rose-500" />
+                                      Cancel Appointment
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             </TableCell>
                           </TableRow>
                         )
@@ -506,6 +542,23 @@ export const AdminJobs: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Admin Cancel Appointment Confirmation Popup */}
+      <ConfirmDialog
+        open={bookingToCancel !== null}
+        onOpenChange={(open) => !open && setBookingToCancel(null)}
+        title="Cancel Appointment (Admin Override)?"
+        description={
+          <>
+            Are you sure you want to cancel the scheduled appointment for <strong>"{bookingToCancel?.jobTitle}"</strong> between customer <strong>{bookingToCancel?.customerName}</strong> and provider <strong>{bookingToCancel?.providerName}</strong>? Both participants will be immediately notified.
+          </>
+        }
+        confirmLabel="Cancel Appointment"
+        variant="destructive"
+        icon="cancel"
+        isLoading={cancellingBooking}
+        onConfirm={handleConfirmCancelBooking}
+      />
     </div>
   )
 }

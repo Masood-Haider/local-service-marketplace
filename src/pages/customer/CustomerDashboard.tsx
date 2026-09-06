@@ -31,6 +31,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { EmptyState } from "@/components/shared/EmptyState"
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 import {
   Calendar as CalendarIcon,
   PlusCircle,
@@ -131,71 +132,68 @@ export const CustomerDashboard: React.FC = () => {
     setSchedulingTarget({ job, quote })
   }
 
-  const handleDeclineQuote = async (job: Job, quote: JobQuote) => {
-    if (!window.confirm(`Are you sure you want to decline the quote of ${quote.price} from ${quote.providerName}?`)) {
-      return
-    }
+  // Modal confirmation states
+  const [quoteToDecline, setQuoteToDecline] = useState<{ job: Job; quote: JobQuote } | null>(null)
+  const [decliningQuote, setDecliningQuote] = useState(false)
+  const [jobToDelete, setJobToDelete] = useState<{ id: string; title: string } | null>(null)
+  const [deletingJob, setDeletingJob] = useState(false)
+  const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null)
+  const [cancellingBooking, setCancellingBooking] = useState(false)
+
+  const handleConfirmDeclineQuote = async () => {
+    if (!quoteToDecline) return
+    const { job, quote } = quoteToDecline
+    setDecliningQuote(true)
     try {
       await declineJobQuote(job.id, quote)
       toast.success("Quote declined", {
         description: `You declined the quote from ${quote.providerName}.`,
       })
+      setQuoteToDecline(null)
     } catch (err: any) {
       console.error("Failed to decline quote:", err)
       toast.error("Failed to decline quote", { description: err.message })
+    } finally {
+      setDecliningQuote(false)
     }
   }
 
-  const [deletingJobId, setDeletingJobId] = useState<string | null>(null)
-
-  const handleDeleteJob = async (jobId: string, title: string) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete your service request "${title}"? This will permanently remove the request and any bids received.`
-      )
-    ) {
-      return
-    }
-
-    setDeletingJobId(jobId)
+  const handleConfirmDeleteJob = async () => {
+    if (!jobToDelete) return
+    const target = jobToDelete
+    setDeletingJob(true)
     try {
-      await deleteCustomerJob(jobId)
+      await deleteCustomerJob(target.id)
       toast.success("Service request deleted", {
-        description: `"${title}" has been permanently removed.`,
+        description: `"${target.title}" has been permanently removed.`,
       })
+      setJobToDelete(null)
     } catch (err: any) {
       console.error("Failed to delete job request:", err)
       toast.error("Failed to delete request", { description: err.message })
     } finally {
-      setDeletingJobId(null)
+      setDeletingJob(false)
     }
   }
 
-  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null)
-
-  const handleCancelBooking = async (bookingId: string, proName: string) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to cancel your scheduled appointment with ${proName}? Both you and the professional will be notified.`
-      )
-    ) {
-      return
-    }
-
-    setCancellingBookingId(bookingId)
+  const handleConfirmCancelBooking = async () => {
+    if (!bookingToCancel) return
+    const booking = bookingToCancel
+    setCancellingBooking(true)
     try {
-      await updateBookingStatus(bookingId, "cancelled")
+      await updateBookingStatus(booking.id, "cancelled")
       setBookings((prev) =>
-        prev.map((b) => (b.id === bookingId ? { ...b, status: "cancelled" } : b))
+        prev.map((b) => (b.id === booking.id ? { ...b, status: "cancelled" } : b))
       )
       toast.success("Appointment cancelled", {
-        description: `Your appointment with ${proName} has been cancelled.`,
+        description: `Your appointment with ${booking.providerName} has been cancelled.`,
       })
+      setBookingToCancel(null)
     } catch (err: any) {
       console.error("Error cancelling booking:", err)
       toast.error("Failed to cancel appointment", { description: err.message || "Operation failed." })
     } finally {
-      setCancellingBookingId(null)
+      setCancellingBooking(false)
     }
   }
 
@@ -393,7 +391,7 @@ export const CustomerDashboard: React.FC = () => {
                     size="sm"
                     variant="outline"
                     className="text-xs text-destructive hover:bg-destructive/10 border-destructive/30"
-                    onClick={() => handleDeclineQuote(job, quote)}
+                    onClick={() => setQuoteToDecline({ job, quote })}
                   >
                     <XCircle className="w-3.5 h-3.5 mr-1" /> Decline
                   </Button>
@@ -485,14 +483,9 @@ export const CustomerDashboard: React.FC = () => {
                           variant="outline"
                           size="sm"
                           className="text-xs text-destructive hover:bg-destructive/10 border-destructive/30 h-7 px-2.5 gap-1"
-                          onClick={() => handleCancelBooking(booking.id, booking.providerName)}
-                          disabled={cancellingBookingId === booking.id}
+                          onClick={() => setBookingToCancel(booking)}
                         >
-                          {cancellingBookingId === booking.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <XCircle className="w-3.5 h-3.5" />
-                          )}
+                          <XCircle className="w-3.5 h-3.5" />
                           Cancel Appointment
                         </Button>
                       )}
@@ -584,15 +577,10 @@ export const CustomerDashboard: React.FC = () => {
                         size="sm"
                         variant="outline"
                         className="text-xs h-8 px-2.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 border-border gap-1"
-                        onClick={() => handleDeleteJob(job.id, job.title)}
-                        disabled={deletingJobId === job.id}
+                        onClick={() => setJobToDelete({ id: job.id, title: job.title })}
                         title="Delete service request"
                       >
-                        {deletingJobId === job.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-3.5 h-3.5" />
-                        )}
+                        <Trash2 className="w-3.5 h-3.5" />
                         Delete
                       </Button>
                       <Link to={`/dashboard/customer/jobs/${job.id}`}>
@@ -738,6 +726,57 @@ export const CustomerDashboard: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Decline Quote Confirmation Popup */}
+      <ConfirmDialog
+        open={quoteToDecline !== null}
+        onOpenChange={(open) => !open && setQuoteToDecline(null)}
+        title="Decline Pro's Quote?"
+        description={
+          <>
+            Are you sure you want to decline the quote of <strong>{quoteToDecline?.quote.price}</strong> from <strong>{quoteToDecline?.quote.providerName}</strong> for "{quoteToDecline?.job.title}"?
+          </>
+        }
+        confirmLabel="Decline Quote"
+        variant="destructive"
+        icon="warning"
+        isLoading={decliningQuote}
+        onConfirm={handleConfirmDeclineQuote}
+      />
+
+      {/* Delete Service Request Confirmation Popup */}
+      <ConfirmDialog
+        open={jobToDelete !== null}
+        onOpenChange={(open) => !open && setJobToDelete(null)}
+        title="Delete Service Request?"
+        description={
+          <>
+            Are you sure you want to permanently delete your service request <strong>"{jobToDelete?.title}"</strong>? This will remove the posting and all submitted provider proposals.
+          </>
+        }
+        confirmLabel="Delete Request"
+        variant="destructive"
+        icon="danger"
+        isLoading={deletingJob}
+        onConfirm={handleConfirmDeleteJob}
+      />
+
+      {/* Cancel Appointment Confirmation Popup */}
+      <ConfirmDialog
+        open={bookingToCancel !== null}
+        onOpenChange={(open) => !open && setBookingToCancel(null)}
+        title="Cancel Scheduled Appointment?"
+        description={
+          <>
+            Are you sure you want to cancel your scheduled service appointment for <strong>"{bookingToCancel?.jobTitle}"</strong> with <strong>{bookingToCancel?.providerName}</strong>? Both you and the professional will receive cancellation notices.
+          </>
+        }
+        confirmLabel="Cancel Appointment"
+        variant="destructive"
+        icon="cancel"
+        isLoading={cancellingBooking}
+        onConfirm={handleConfirmCancelBooking}
+      />
     </div>
   )
 }

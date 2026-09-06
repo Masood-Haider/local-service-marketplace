@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { EmptyState } from "@/components/shared/EmptyState"
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 import {
   Dialog,
   DialogContent,
@@ -77,7 +78,10 @@ export const ProviderDashboard: React.FC = () => {
   const [acceptTime, setAcceptTime] = useState("10:00 AM - 12:00 PM")
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false)
   const [processingDirectQuote, setProcessingDirectQuote] = useState(false)
-  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null)
+  const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null)
+  const [quoteToDecline, setQuoteToDecline] = useState<DirectQuote | null>(null)
+  const [cancellingBooking, setCancellingBooking] = useState(false)
+  const [decliningQuote, setDecliningQuote] = useState(false)
 
   // Load provider profile
   useEffect(() => {
@@ -224,42 +228,44 @@ export const ProviderDashboard: React.FC = () => {
     }
   }
 
-  const handleCancelBooking = async (bookingId: string, clientName: string) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to cancel the scheduled booking for ${clientName}? Both you and the client will be notified.`
-      )
-    ) {
-      return
-    }
-
-    setCancellingBookingId(bookingId)
+  const handleConfirmCancelBooking = async () => {
+    if (!bookingToCancel) return
+    const booking = bookingToCancel
+    setCancellingBooking(true)
     try {
-      await updateBookingStatus(bookingId, "cancelled")
+      await updateBookingStatus(booking.id, "cancelled")
       setBookings((prev) =>
-        prev.map((b) => (b.id === bookingId ? { ...b, status: "cancelled" } : b))
+        prev.map((b) => (b.id === booking.id ? { ...b, status: "cancelled" } : b))
       )
       toast.success("Booking cancelled", {
-        description: `Scheduled appointment for ${clientName} has been cancelled.`,
+        description: `Scheduled appointment for ${booking.customerName} has been cancelled.`,
       })
+      setBookingToCancel(null)
     } catch (err: any) {
       console.error("Error cancelling booking:", err)
       toast.error("Failed to cancel booking", { description: err.message || "Operation failed." })
     } finally {
-      setCancellingBookingId(null)
+      setCancellingBooking(false)
     }
   }
 
-  const handleDeclineDirectQuote = async (quote: DirectQuote) => {
-    if (!window.confirm(`Decline quote request from ${quote.customerName}?`)) return
+  const handleConfirmDeclineDirectQuote = async () => {
+    if (!quoteToDecline) return
+    const quote = quoteToDecline
+    setDecliningQuote(true)
     try {
       await declineDirectQuote(quote.id, quote.customerId, profile?.name || currentUser?.name)
       // Immediately remove from pending direct quotes in UI
       setDirectQuotes((prev) => prev.filter((q) => q.id !== quote.id))
-      toast.success("Request declined")
+      toast.success("Request declined", {
+        description: `Declined quote request from ${quote.customerName}.`,
+      })
+      setQuoteToDecline(null)
     } catch (err: any) {
       console.error("Error declining quote:", err)
       toast.error("Failed to decline request", { description: err.message })
+    } finally {
+      setDecliningQuote(false)
     }
   }
 
@@ -528,7 +534,7 @@ export const ProviderDashboard: React.FC = () => {
                           size="sm"
                           variant="outline"
                           className="text-xs h-8 px-3 text-destructive border-destructive/30 hover:bg-destructive/10"
-                          onClick={() => handleDeclineDirectQuote(quote)}
+                          onClick={() => setQuoteToDecline(quote)}
                         >
                           Decline
                         </Button>
@@ -635,14 +641,9 @@ export const ProviderDashboard: React.FC = () => {
                           variant="outline"
                           size="sm"
                           className="text-xs text-destructive hover:bg-destructive/10 border-destructive/30 h-7 px-2.5 gap-1"
-                          onClick={() => handleCancelBooking(booking.id, booking.customerName)}
-                          disabled={cancellingBookingId === booking.id}
+                          onClick={() => setBookingToCancel(booking)}
                         >
-                          {cancellingBookingId === booking.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <XCircle className="w-3.5 h-3.5" />
-                          )}
+                          <XCircle className="w-3.5 h-3.5" />
                           Cancel Booking
                         </Button>
                       )}
@@ -933,6 +934,40 @@ export const ProviderDashboard: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cancel Booking Confirmation Popup */}
+      <ConfirmDialog
+        open={bookingToCancel !== null}
+        onOpenChange={(open) => !open && setBookingToCancel(null)}
+        title="Cancel Scheduled Booking?"
+        description={
+          <>
+            Are you sure you want to cancel the scheduled appointment for <strong>"{bookingToCancel?.jobTitle}"</strong> with <strong>{bookingToCancel?.customerName}</strong>? Both you and the client will be immediately notified.
+          </>
+        }
+        confirmLabel="Cancel Booking"
+        variant="destructive"
+        icon="cancel"
+        isLoading={cancellingBooking}
+        onConfirm={handleConfirmCancelBooking}
+      />
+
+      {/* Decline Quote Confirmation Popup */}
+      <ConfirmDialog
+        open={quoteToDecline !== null}
+        onOpenChange={(open) => !open && setQuoteToDecline(null)}
+        title="Decline Quote Request?"
+        description={
+          <>
+            Are you sure you want to decline the request for <strong>"{quoteToDecline?.serviceNeeded}"</strong> from <strong>{quoteToDecline?.customerName}</strong>? The customer will be informed that you cannot fulfill this request.
+          </>
+        }
+        confirmLabel="Decline Request"
+        variant="destructive"
+        icon="warning"
+        isLoading={decliningQuote}
+        onConfirm={handleConfirmDeclineDirectQuote}
+      />
     </div>
   )
 }

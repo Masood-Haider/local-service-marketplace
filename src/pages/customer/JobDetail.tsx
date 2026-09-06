@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { EmptyState } from "@/components/shared/EmptyState"
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 import {
   MapPin,
   Calendar as CalendarIcon,
@@ -53,6 +54,9 @@ export const JobDetail: React.FC = () => {
   const [quotes, setQuotes] = useState<JobQuote[]>([])
   const [loadingJob, setLoadingJob] = useState(true)
   const [deleting, setDeleting] = useState(false)
+  const [quoteToDecline, setQuoteToDecline] = useState<JobQuote | null>(null)
+  const [decliningQuote, setDecliningQuote] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Scheduling Modal State
   const [schedulingQuote, setSchedulingQuote] = useState<JobQuote | null>(null)
@@ -100,19 +104,21 @@ export const JobDetail: React.FC = () => {
     setSchedulingQuote(quote)
   }
 
-  const handleDeclineQuote = async (quote: JobQuote) => {
-    if (!job) return
-    if (!window.confirm(`Are you sure you want to decline the quote of ${quote.price} from ${quote.providerName}?`)) {
-      return
-    }
+  const handleConfirmDeclineQuote = async () => {
+    if (!job || !quoteToDecline) return
+    const quote = quoteToDecline
+    setDecliningQuote(true)
     try {
       await declineJobQuote(job.id, quote)
       toast.success("Quote declined", {
         description: `You declined the quote from ${quote.providerName}.`,
       })
+      setQuoteToDecline(null)
     } catch (err: any) {
       console.error("Failed to decline quote:", err)
       toast.error("Failed to decline quote", { description: err.message })
+    } finally {
+      setDecliningQuote(false)
     }
   }
 
@@ -159,26 +165,20 @@ export const JobDetail: React.FC = () => {
     }
   }
 
-  const handleDeleteJob = async () => {
+  const handleConfirmDeleteJob = async () => {
     if (!job) return
-    if (
-      !window.confirm(
-        `Are you sure you want to delete your service request "${job.title}"? This will permanently delete this posting and any quotes received.`
-      )
-    ) {
-      return
-    }
-
     setDeleting(true)
     try {
       await deleteCustomerJob(job.id)
       toast.success("Service request deleted", {
         description: `"${job.title}" was permanently removed.`,
       })
+      setShowDeleteConfirm(false)
       navigate("/dashboard/customer")
     } catch (err: any) {
-      console.error("Failed to delete request:", err)
+      console.error("Failed to delete service request:", err)
       toast.error("Failed to delete request", { description: err.message })
+    } finally {
       setDeleting(false)
     }
   }
@@ -223,15 +223,10 @@ export const JobDetail: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleDeleteJob}
-            disabled={deleting}
+            onClick={() => setShowDeleteConfirm(true)}
             className="text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 border-destructive/30 gap-1.5"
           >
-            {deleting ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Trash2 className="w-3.5 h-3.5 text-destructive" />
-            )}
+            <Trash2 className="w-3.5 h-3.5 text-destructive" />
             Delete Request
           </Button>
         )}
@@ -400,7 +395,7 @@ export const JobDetail: React.FC = () => {
                             size="sm"
                             variant="outline"
                             className="text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
-                            onClick={() => handleDeclineQuote(quote)}
+                            onClick={() => setQuoteToDecline(quote)}
                           >
                             Decline
                           </Button>
@@ -549,6 +544,40 @@ export const JobDetail: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Decline Quote Confirmation Popup */}
+      <ConfirmDialog
+        open={quoteToDecline !== null}
+        onOpenChange={(open) => !open && setQuoteToDecline(null)}
+        title="Decline Pro's Quote?"
+        description={
+          <>
+            Are you sure you want to decline the quote of <strong>{quoteToDecline?.price}</strong> from <strong>{quoteToDecline?.providerName}</strong>?
+          </>
+        }
+        confirmLabel="Decline Quote"
+        variant="destructive"
+        icon="warning"
+        isLoading={decliningQuote}
+        onConfirm={handleConfirmDeclineQuote}
+      />
+
+      {/* Delete Service Request Confirmation Popup */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete Service Request?"
+        description={
+          <>
+            Are you sure you want to permanently delete your service request <strong>"{job?.title}"</strong>? This will remove the posting and all submitted provider proposals.
+          </>
+        }
+        confirmLabel="Delete Request"
+        variant="destructive"
+        icon="danger"
+        isLoading={deleting}
+        onConfirm={handleConfirmDeleteJob}
+      />
     </div>
   )
 }

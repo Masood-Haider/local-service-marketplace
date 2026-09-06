@@ -21,6 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/shared/EmptyState"
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 import {
   Calendar as CalendarIcon,
   PlusCircle,
@@ -55,15 +56,23 @@ export const CustomerBookings: React.FC = () => {
     return () => unsubscribe()
   }, [currentUser?.uid])
 
-  const handleCancelBooking = async (bookingId: string) => {
-    setUpdatingId(bookingId)
+  const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null)
+  const [cancellingBooking, setCancellingBooking] = useState(false)
+
+  const handleConfirmCancelBooking = async () => {
+    if (!bookingToCancel) return
+    const booking = bookingToCancel
+    setCancellingBooking(true)
     try {
-      await updateBookingStatus(bookingId, "cancelled")
-      toast.success("Booking cancelled")
+      await updateBookingStatus(booking.id, "cancelled")
+      toast.success("Booking cancelled", {
+        description: `Your appointment with ${booking.providerName} has been cancelled.`,
+      })
+      setBookingToCancel(null)
     } catch (err: any) {
       toast.error("Failed to cancel booking", { description: err.message })
     } finally {
-      setUpdatingId(null)
+      setCancellingBooking(false)
     }
   }
 
@@ -201,8 +210,7 @@ export const CustomerBookings: React.FC = () => {
                         variant="outline"
                         size="sm"
                         className="text-xs h-8 text-rose-500 border-rose-500/20 hover:bg-rose-500/10"
-                        onClick={() => handleCancelBooking(booking.id)}
-                        disabled={updatingId === booking.id}
+                        onClick={() => setBookingToCancel(booking)}
                       >
                         <XCircle className="w-3.5 h-3.5 mr-1" /> Cancel
                       </Button>
@@ -296,8 +304,7 @@ export const CustomerBookings: React.FC = () => {
                                 size="sm"
                                 variant="outline"
                                 className="text-xs h-8 text-rose-500 border-rose-500/20 hover:bg-rose-500/10"
-                                onClick={() => handleCancelBooking(booking.id)}
-                                disabled={updatingId === booking.id}
+                                onClick={() => setBookingToCancel(booking)}
                               >
                                 Cancel
                               </Button>
@@ -332,6 +339,23 @@ export const CustomerBookings: React.FC = () => {
         booking={reviewBooking}
         open={reviewBooking !== null}
         onOpenChange={(open) => !open && setReviewBooking(null)}
+      />
+
+      {/* Cancel Appointment Confirmation Popup */}
+      <ConfirmDialog
+        open={bookingToCancel !== null}
+        onOpenChange={(open) => !open && setBookingToCancel(null)}
+        title="Cancel Service Appointment?"
+        description={
+          <>
+            Are you sure you want to cancel your scheduled appointment for <strong>"{bookingToCancel?.jobTitle}"</strong> with <strong>{bookingToCancel?.providerName}</strong>? Both you and the professional will receive cancellation notices.
+          </>
+        }
+        confirmLabel="Cancel Appointment"
+        variant="destructive"
+        icon="cancel"
+        isLoading={cancellingBooking}
+        onConfirm={handleConfirmCancelBooking}
       />
     </div>
   )
