@@ -282,7 +282,7 @@ export const JobDetail: React.FC = () => {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-3.5">
                         <Avatar className="h-12 w-12 rounded-xl border border-border">
-                          <AvatarImage src={quote.providerPhotoURL} alt={quote.providerName} />
+                          <AvatarImage src={quote.providerPhotoURL || undefined} alt={quote.providerName} />
                           <AvatarFallback className="bg-primary/10 text-primary font-bold">
                             {quote.providerName?.[0]?.toUpperCase() || "P"}
                           </AvatarFallback>

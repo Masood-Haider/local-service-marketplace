@@ -22,8 +22,12 @@ import {
   submitJobQuote,
   listenToProviderBookings,
   getBookingStatusBadge,
+  listenToProviderDirectQuotes,
+  acceptDirectQuote,
+  declineDirectQuote,
   Job,
   Booking,
+  DirectQuote,
 } from "@/services/jobService"
 import {
   DollarSign,
@@ -41,6 +45,10 @@ import {
   Calendar,
   Loader2,
   CheckCircle2,
+  Inbox,
+  Mail,
+  Phone,
+  Filter,
 } from "lucide-react"
 import { Link } from "react-router-dom"
 
@@ -51,11 +59,20 @@ export const ProviderDashboard: React.FC = () => {
   const [profile, setProfile] = useState<ProviderProfile | null>(null)
   const [openJobs, setOpenJobs] = useState<Job[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
+  const [directQuotes, setDirectQuotes] = useState<DirectQuote[]>([])
+  const [selectedTradeFilter, setSelectedTradeFilter] = useState<string>("All")
+
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
   const [quotePrice, setQuotePrice] = useState("")
   const [quoteMessage, setQuoteMessage] = useState("")
   const [submittingQuote, setSubmittingQuote] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
+
+  // Direct Quote accept dialog state
+  const [selectedDirectQuote, setSelectedDirectQuote] = useState<DirectQuote | null>(null)
+  const [acceptPrice, setAcceptPrice] = useState("")
+  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false)
+  const [processingDirectQuote, setProcessingDirectQuote] = useState(false)
 
   // Load provider profile
   useEffect(() => {
@@ -64,6 +81,9 @@ export const ProviderDashboard: React.FC = () => {
         try {
           const data = await getProviderProfile(currentUser.uid)
           setProfile(data)
+          if (data?.category) {
+            setSelectedTradeFilter(data.category)
+          }
         } catch (err) {
           console.error("Error loading provider profile:", err)
         }
@@ -72,21 +92,30 @@ export const ProviderDashboard: React.FC = () => {
     loadData()
   }, [currentUser])
 
-  // Real-time listener for open jobs matching provider's category
+  // Real-time listener for open marketplace jobs matching selected category
   useEffect(() => {
-    const category = profile?.category || undefined
-    const unsubscribe = listenToOpenJobs(category, (jobs) => {
+    const filterCat = selectedTradeFilter === "All" ? undefined : selectedTradeFilter
+    const unsubscribe = listenToOpenJobs(filterCat, (jobs) => {
       setOpenJobs(jobs)
     })
 
     return () => unsubscribe()
-  }, [profile?.category])
+  }, [selectedTradeFilter])
 
   // Real-time listener for provider's confirmed bookings
   useEffect(() => {
     if (!currentUser?.uid) return
     const unsubscribe = listenToProviderBookings(currentUser.uid, (data) => {
       setBookings(data)
+    })
+    return () => unsubscribe()
+  }, [currentUser?.uid])
+
+  // Real-time listener for direct quote requests / offers sent by clients
+  useEffect(() => {
+    if (!currentUser?.uid) return
+    const unsubscribe = listenToProviderDirectQuotes(currentUser.uid, (data) => {
+      setDirectQuotes(data)
     })
     return () => unsubscribe()
   }, [currentUser?.uid])
@@ -114,7 +143,7 @@ export const ProviderDashboard: React.FC = () => {
       await submitJobQuote(selectedJob.id, {
         providerId: currentUser.uid,
         providerName: profile?.name || currentUser.name,
-        providerPhotoURL: profile?.photoURL || currentUser.photoURL || undefined,
+        providerPhotoURL: profile?.photoURL || currentUser.photoURL || null,
         price: quotePrice.trim(),
         message: quoteMessage.trim(),
       })
@@ -125,9 +154,45 @@ export const ProviderDashboard: React.FC = () => {
       setDialogOpen(false)
       setSelectedJob(null)
     } catch (err: any) {
-      toast.error("Could not submit quote", { description: err.message })
+      console.error("Quote submission error:", err)
+      toast.error("Could not submit quote", { description: err.message || "Operation failed." })
     } finally {
       setSubmittingQuote(false)
+    }
+  }
+
+  const handleOpenAcceptDirectDialog = (quote: DirectQuote) => {
+    setSelectedDirectQuote(quote)
+    setAcceptPrice(profile?.priceRange ? profile.priceRange.split("-")[0].trim() : "$100")
+    setAcceptDialogOpen(true)
+  }
+
+  const handleConfirmAcceptDirectQuote = async () => {
+    if (!selectedDirectQuote) return
+    setProcessingDirectQuote(true)
+    try {
+      await acceptDirectQuote(selectedDirectQuote, acceptPrice.trim() || undefined)
+      toast.success("Client Offer Accepted & Booked!", {
+        description: `Appointment confirmed for ${selectedDirectQuote.customerName}.`,
+      })
+      setAcceptDialogOpen(false)
+      setSelectedDirectQuote(null)
+    } catch (err: any) {
+      console.error("Error accepting quote:", err)
+      toast.error("Failed to accept offer", { description: err.message })
+    } finally {
+      setProcessingDirectQuote(false)
+    }
+  }
+
+  const handleDeclineDirectQuote = async (quote: DirectQuote) => {
+    if (!window.confirm(`Decline quote request from ${quote.customerName}?`)) return
+    try {
+      await declineDirectQuote(quote.id, quote.customerId, profile?.name || currentUser?.name)
+      toast.success("Request declined")
+    } catch (err: any) {
+      console.error("Error declining quote:", err)
+      toast.error("Failed to decline request", { description: err.message })
     }
   }
 
@@ -212,54 +277,242 @@ export const ProviderDashboard: React.FC = () => {
       )}
 
       {/* Stats row */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Available Jobs</CardTitle>
-            <Briefcase className="w-4 h-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{openJobs.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Matching {profile?.category || "all trades"}
+      {(() => {
+        const pendingDirectCount = directQuotes.filter((q) => q.status === "pending").length
+
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
+            <Card className={pendingDirectCount > 0 ? "border-primary/50 shadow-xs ring-1 ring-primary/20" : ""}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Direct Inquiries</CardTitle>
+                <Inbox className={`w-4 h-4 ${pendingDirectCount > 0 ? "text-primary animate-bounce" : "text-muted-foreground"}`} />
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  <div className="text-2xl font-bold">{directQuotes.length}</div>
+                  {pendingDirectCount > 0 && (
+                    <Badge className="bg-primary text-primary-foreground text-[10px] h-5 px-1.5 font-bold">
+                      {pendingDirectCount} New
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {pendingDirectCount > 0 ? `${pendingDirectCount} awaiting your response` : "Direct client offers"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Available Jobs</CardTitle>
+                <Briefcase className="w-4 h-4 text-primary" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{openJobs.length}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {selectedTradeFilter === "All" ? "All trades" : selectedTradeFilter}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Booked Jobs</CardTitle>
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{bookings.length}</div>
+                <p className="text-xs text-muted-foreground mt-1">Confirmed appointments</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Customer Rating</CardTitle>
+                <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{profile?.avgRating || "5.0"}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Based on {profile?.totalReviews || 0} reviews
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )
+      })()}
+
+      {/* Direct Client Offers & Quote Inquiries Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-xl font-bold text-foreground">Direct Client Offers & Quote Inquiries</h3>
+              {directQuotes.filter((q) => q.status === "pending").length > 0 && (
+                <Badge className="bg-primary text-primary-foreground text-xs font-bold animate-pulse">
+                  {directQuotes.filter((q) => q.status === "pending").length} Action Required
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Customers who contacted you directly through your public profile page
             </p>
-          </CardContent>
-        </Card>
+          </div>
+          <Badge variant="outline" className="text-xs">
+            {directQuotes.length} Total Offer{directQuotes.length === 1 ? "" : "s"}
+          </Badge>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Booked Jobs</CardTitle>
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{bookings.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Confirmed client bookings</p>
-          </CardContent>
-        </Card>
+        {directQuotes.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {directQuotes.map((quote) => {
+              const isPending = quote.status === "pending"
+              const isAccepted = quote.status === "accepted"
+              const isDeclined = quote.status === "declined"
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Customer Rating</CardTitle>
-            <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{profile?.avgRating || "5.0"}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Based on {profile?.totalReviews || 0} reviews
-            </p>
-          </CardContent>
-        </Card>
+              return (
+                <Card
+                  key={quote.id}
+                  className={`hover:shadow-md transition-all border flex flex-col justify-between ${
+                    isPending
+                      ? "border-primary/40 bg-primary/[0.02]"
+                      : isAccepted
+                      ? "border-emerald-500/30 bg-emerald-500/[0.02]"
+                      : "border-border opacity-70"
+                  }`}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <Badge variant="outline" className="text-[11px] font-semibold text-primary border-primary/30">
+                            {quote.serviceNeeded || "Custom Service"}
+                          </Badge>
+                          {isPending && (
+                            <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[10px] gap-1">
+                              <Clock className="w-3 h-3" /> Awaiting Response
+                            </Badge>
+                          )}
+                          {isAccepted && (
+                            <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[10px] gap-1">
+                              <CheckCircle2 className="w-3 h-3" /> Confirmed Booking
+                            </Badge>
+                          )}
+                          {isDeclined && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              Declined
+                            </Badge>
+                          )}
+                        </div>
+                        <CardTitle className="text-lg font-bold leading-tight">
+                          Offer from {quote.customerName}
+                        </CardTitle>
+                      </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Trade Specialty</CardTitle>
-            <ShieldCheck className="w-4 h-4 text-cyan-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold truncate">{profile?.category || "General Trade"}</div>
-            <p className="text-xs text-muted-foreground mt-1">Verified status active</p>
-          </CardContent>
-        </Card>
+                      {quote.price && (
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                            Rate
+                          </span>
+                          <span className="font-black text-sm text-emerald-600 dark:text-emerald-400">
+                            {quote.price}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="space-y-3 pt-0">
+                    <div className="p-3 rounded-lg bg-muted/40 border border-border/50 text-xs text-foreground/90 leading-relaxed">
+                      <p className="font-semibold text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
+                        Client Scope & Request:
+                      </p>
+                      {quote.projectDetails || "No additional project details provided."}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground pt-1 border-t border-border/60">
+                      <span className="flex items-center gap-1.5 truncate">
+                        <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
+                        {quote.serviceLocation || "Location on inquiry"}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-primary shrink-0" />
+                        {quote.preferredDate ? `Target Date: ${quote.preferredDate}` : "Flexible schedule"}
+                      </span>
+                    </div>
+
+                    {/* Client Direct Contact details */}
+                    <div className="flex flex-wrap items-center gap-3 pt-2 text-xs">
+                      {quote.customerEmail && (
+                        <a
+                          href={`mailto:${quote.customerEmail}`}
+                          className="flex items-center gap-1 text-primary hover:underline"
+                        >
+                          <Mail className="w-3.5 h-3.5" /> {quote.customerEmail}
+                        </a>
+                      )}
+                      {quote.customerPhone && (
+                        <a
+                          href={`tel:${quote.customerPhone}`}
+                          className="flex items-center gap-1 text-primary hover:underline"
+                        >
+                          <Phone className="w-3.5 h-3.5" /> {quote.customerPhone}
+                        </a>
+                      )}
+                    </div>
+                  </CardContent>
+
+                  <CardFooter className="border-t border-border/60 pt-3.5 flex items-center justify-between bg-muted/20">
+                    <span className="text-[11px] text-muted-foreground">
+                      {quote.createdAt?.toDate
+                        ? `Received ${quote.createdAt.toDate().toLocaleDateString()}`
+                        : "Direct request"}
+                    </span>
+
+                    {isPending ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-8 px-3 text-destructive border-destructive/30 hover:bg-destructive/10"
+                          onClick={() => handleDeclineDirectQuote(quote)}
+                        >
+                          Decline
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="gap-1.5 text-xs h-8 px-4 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                          onClick={() => handleOpenAcceptDirectDialog(quote)}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Accept & Schedule
+                        </Button>
+                      </div>
+                    ) : isAccepted ? (
+                      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-4 h-4" /> Active Client Booking
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Offer Declined</span>
+                    )}
+                  </CardFooter>
+                </Card>
+              )
+            })}
+          </div>
+        ) : (
+          <EmptyState
+            icon={Inbox}
+            title="No Direct Offers Yet"
+            description="When clients view your public profile and click 'Request a Quote', their direct project offers and contact information will appear here immediately."
+            action={
+              <Link to={`/providers/${currentUser?.uid}`}>
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <Eye className="w-4 h-4 text-primary" /> View Your Public Profile
+                </Button>
+              </Link>
+            }
+          />
+        )}
       </div>
 
       {/* Active Bookings Section */}
@@ -319,19 +572,41 @@ export const ProviderDashboard: React.FC = () => {
 
       {/* Real-time Open Jobs Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-xl font-bold text-foreground">Open Jobs in Your Trade</h3>
+              <h3 className="text-xl font-bold text-foreground">Open Marketplace Jobs</h3>
               <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Customers waiting for quotes • Updates automatically in real time
+              Submit quotes / bids directly to customer postings
             </p>
           </div>
-          <Badge variant="outline" className="text-xs">
-            {openJobs.length} Open Request{openJobs.length === 1 ? "" : "s"}
-          </Badge>
+
+          {/* Trade Category Filter buttons */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Button
+              size="sm"
+              variant={selectedTradeFilter === "All" ? "default" : "outline"}
+              className="h-7 text-xs px-2.5"
+              onClick={() => setSelectedTradeFilter("All")}
+            >
+              All Trades
+            </Button>
+            {profile?.category && (
+              <Button
+                size="sm"
+                variant={selectedTradeFilter === profile.category ? "default" : "outline"}
+                className="h-7 text-xs px-2.5"
+                onClick={() => setSelectedTradeFilter(profile.category)}
+              >
+                My Trade ({profile.category})
+              </Button>
+            )}
+            <Badge variant="outline" className="text-xs ml-1">
+              {openJobs.length} Job{openJobs.length === 1 ? "" : "s"}
+            </Badge>
+          </div>
         </div>
 
         {openJobs.length > 0 ? (
@@ -465,6 +740,68 @@ export const ProviderDashboard: React.FC = () => {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Accept & Confirm Direct Quote Modal */}
+      <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              Accept Client Offer & Schedule Booking
+            </DialogTitle>
+            <DialogDescription>
+              Confirm your rate or estimate for {selectedDirectQuote?.customerName}'s request (
+              {selectedDirectQuote?.serviceNeeded}).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                Confirmed Price / Estimate *
+              </label>
+              <div className="relative">
+                <DollarSign className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                <Input
+                  value={acceptPrice}
+                  onChange={(e) => setAcceptPrice(e.target.value)}
+                  placeholder="e.g. $125 or $85/hr"
+                  className="pl-9"
+                  required
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                This confirmed rate will be recorded on the official client appointment.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-3 gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setAcceptDialogOpen(false)}
+              disabled={processingDirectQuote}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmAcceptDirectQuote}
+              disabled={processingDirectQuote}
+              className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {processingDirectQuote ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Scheduling...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" /> Confirm & Book Client
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

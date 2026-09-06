@@ -41,7 +41,7 @@ export interface JobQuote {
   jobId: string
   providerId: string
   providerName: string
-  providerPhotoURL?: string
+  providerPhotoURL?: string | null
   price: string
   message: string
   status: "pending" | "accepted" | "declined"
@@ -160,21 +160,25 @@ export function listenToOpenJobs(
 ): Unsubscribe {
   const jobsCol = collection(db, "jobs")
 
-  let q = query(jobsCol, where("status", "==", "open"))
-  if (category && category !== "All") {
-    q = query(jobsCol, where("status", "==", "open"), where("category", "==", category))
-  }
+  const q = query(jobsCol, where("status", "==", "open"))
 
-  return onSnapshot(q, (snapshot) => {
-    const jobs: Job[] = []
-    snapshot.forEach((d) => {
-      jobs.push({ id: d.id, ...(d.data() as any) })
-    })
-    callback(jobs)
-  }, (err) => {
-    console.warn("listenToOpenJobs error:", err)
-    callback([])
-  })
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const jobs: Job[] = []
+      snapshot.forEach((d) => {
+        const data = d.data() as any
+        if (!category || category === "All" || data.category === category) {
+          jobs.push({ id: d.id, ...data })
+        }
+      })
+      callback(jobs)
+    },
+    (err) => {
+      console.warn("listenToOpenJobs error:", err)
+      callback([])
+    }
+  )
 }
 
 /**
@@ -228,12 +232,26 @@ export async function submitJobQuote(
   quoteData: Omit<JobQuote, "id" | "jobId" | "status" | "createdAt">
 ): Promise<string> {
   const quotesCol = collection(db, "jobs", jobId, "quotes")
-  const docRef = await addDoc(quotesCol, {
-    ...quoteData,
+  
+  const payload: any = {
+    providerId: quoteData.providerId,
+    providerName: quoteData.providerName,
+    providerPhotoURL: quoteData.providerPhotoURL || null,
+    price: quoteData.price,
+    message: quoteData.message,
     jobId,
     status: "pending",
     createdAt: serverTimestamp(),
+  }
+
+  // Ensure no undefined values are sent to Firestore
+  Object.keys(payload).forEach((key) => {
+    if (payload[key] === undefined) {
+      delete payload[key]
+    }
   })
+
+  const docRef = await addDoc(quotesCol, payload)
 
   // Notify the job's customer that a provider submitted a quote
   try {
@@ -433,3 +451,128 @@ export function listenToProviderBookings(
     callback([])
   })
 }
+
+export interface DirectQuote {
+  id: string
+  providerId: string
+  providerName: string
+  customerId?: string
+  customerName: string
+  customerEmail: string
+  customerPhone?: string
+  serviceNeeded: string
+  serviceLocation: string
+  preferredDate?: string
+  projectDetails: string
+  status: "pending" | "accepted" | "declined"
+  price?: string
+  createdAt?: any
+}
+
+/**
+ * Subscribes in real time to direct quote requests / client offers sent to this provider.
+ */
+export function listenToProviderDirectQuotes(
+  providerId: string,
+  callback: (quotes: DirectQuote[]) => void
+): Unsubscribe {
+  const quotesCol = collection(db, "quotes")
+  const q = query(quotesCol, where("providerId", "==", providerId))
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const list: DirectQuote[] = []
+      snapshot.forEach((d) => {
+        list.push({ id: d.id, ...(d.data() as any) })
+      })
+      list.sort((a, b) => {
+        const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0
+        const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0
+        return tB - tA
+      })
+      callback(list)
+    },
+    (err) => {
+      console.warn("listenToProviderDirectQuotes error:", err)
+      callback([])
+    }
+  )
+}
+
+/**
+ * Accepts a direct client quote request / offer:
+ * 1. Updates quote status to "accepted"
+ * 2. Creates a confirmed booking record in "bookings" collection
+ * 3. Sends real-time notification to the customer
+ */
+export async function acceptDirectQuote(
+  quote: DirectQuote,
+  customPrice?: string
+): Promise<string> {
+  const quoteRef = doc(db, "quotes", quote.id)
+  await updateDoc(quoteRef, {
+    status: "accepted",
+    price: customPrice || "Agreed upon direct estimate",
+    updatedAt: serverTimestamp(),
+  })
+
+  // Create booking record
+  const bookingsCol = collection(db, "bookings")
+  const bookingRef = await addDoc(bookingsCol, {
+    jobId: quote.id,
+    jobTitle: quote.serviceNeeded,
+    customerId: quote.customerId || "",
+    customerName: quote.customerName,
+    providerId: quote.providerId,
+    providerName: quote.providerName,
+    category: quote.serviceNeeded,
+    price: customPrice || "Estimate on inspection",
+    scheduledDate: quote.preferredDate || new Date().toISOString().split("T")[0],
+    location: quote.serviceLocation,
+    status: "confirmed",
+    createdAt: serverTimestamp(),
+  })
+
+  if (quote.customerId) {
+    try {
+      await createNotification({
+        userId: quote.customerId,
+        message: `${quote.providerName} accepted your direct service request for "${quote.serviceNeeded}"!`,
+        type: "quote_accepted",
+      })
+    } catch (nErr) {
+      console.warn("Failed to notify customer of accepted quote:", nErr)
+    }
+  }
+
+  return bookingRef.id
+}
+
+/**
+ * Declines a direct client quote request / offer.
+ */
+export async function declineDirectQuote(
+  quoteId: string,
+  customerId?: string,
+  providerName?: string
+): Promise<void> {
+  const quoteRef = doc(db, "quotes", quoteId)
+  await updateDoc(quoteRef, {
+    status: "declined",
+    updatedAt: serverTimestamp(),
+  })
+
+  if (customerId && providerName) {
+    try {
+      await createNotification({
+        userId: customerId,
+        message: `${providerName} was unable to accept your quote request at this time.`,
+        type: "general",
+      })
+    } catch (nErr) {
+      console.warn("Failed to notify customer of declined quote:", nErr)
+    }
+  }
+}
+
