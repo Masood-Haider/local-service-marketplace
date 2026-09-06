@@ -202,7 +202,13 @@ export const ProviderDashboard: React.FC = () => {
         title="Provider Business Hub"
         description="Review incoming jobs in your trade, send quotes in real time, and manage booked appointments."
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link to="/dashboard/provider/services">
+              <Button variant="outline" className="gap-2">
+                <DollarSign className="w-4 h-4 text-primary" />
+                Services & Pricing
+              </Button>
+            </Link>
             <Link to="/dashboard/provider/onboarding">
               <Button variant="outline" className="gap-2">
                 <UserCheck className="w-4 h-4 text-primary" />

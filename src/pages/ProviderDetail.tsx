@@ -680,6 +680,39 @@ export const ProviderDetail: React.FC = () => {
                   </p>
                 </div>
               </div>
+
+              {/* Configured Services & Prices Menu */}
+              {provider.services && provider.services.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-sm font-bold text-foreground">Service Packages & Standard Rates</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {provider.services.map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-4 rounded-xl border border-border bg-card flex flex-col justify-between gap-2 shadow-2xs"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="font-bold text-sm text-foreground">{item.name}</span>
+                            <Badge variant="secondary" className="text-[10px]">
+                              {item.rateType || "Standard"}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {item.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs">
+                          <span className="text-muted-foreground font-medium">Standard Rate:</span>
+                          <span className="font-black text-sm text-emerald-600 dark:text-emerald-400">
+                            {item.price}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -2,6 +2,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
   getDocs,
   collection,
   query,
@@ -19,6 +20,14 @@ import {
 import { db, storage } from "@/firebase/config"
 import { createNotification } from "@/services/notificationService"
 
+export interface ProviderServiceItem {
+  id: string
+  name: string
+  price: string
+  rateType?: string
+  description: string
+}
+
 export interface ProviderProfile {
   uid: string
   name: string
@@ -28,6 +37,7 @@ export interface ProviderProfile {
   serviceArea: string
   photoURL: string
   portfolioImages: string[]
+  services?: ProviderServiceItem[]
   avgRating: number
   totalReviews: number
   phone?: string
@@ -285,4 +295,32 @@ export async function submitQuoteRequest(quote: Omit<QuoteRequest, "createdAt" |
   }
 
   return docRef.id
+}
+
+/**
+ * Updates the service packages / pricing matrix of a provider in Firestore.
+ */
+export async function saveProviderServices(
+  uid: string,
+  services: ProviderServiceItem[]
+): Promise<void> {
+  const providerRef = doc(db, "providers", uid)
+  await updateDoc(providerRef, {
+    services,
+    updatedAt: serverTimestamp(),
+  })
+}
+
+/**
+ * Updates the display price range of a provider in Firestore.
+ */
+export async function updateProviderPriceRange(
+  uid: string,
+  priceRange: string
+): Promise<void> {
+  const providerRef = doc(db, "providers", uid)
+  await updateDoc(providerRef, {
+    priceRange,
+    updatedAt: serverTimestamp(),
+  })
 }
