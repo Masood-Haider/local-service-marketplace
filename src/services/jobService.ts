@@ -478,6 +478,11 @@ export function listenToCustomerBookings(
     snapshot.forEach((d) => {
       list.push({ id: d.id, ...(d.data() as any) })
     })
+    list.sort((a, b) => {
+      const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0
+      const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0
+      return tB - tA
+    })
     callback(list)
   }, (err) => {
     console.warn("listenToCustomerBookings error:", err)
@@ -499,6 +504,11 @@ export function listenToProviderBookings(
     const list: Booking[] = []
     snapshot.forEach((d) => {
       list.push({ id: d.id, ...(d.data() as any) })
+    })
+    list.sort((a, b) => {
+      const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0
+      const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0
+      return tB - tA
     })
     callback(list)
   }, (err) => {
@@ -563,7 +573,8 @@ export function listenToProviderDirectQuotes(
  */
 export async function acceptDirectQuote(
   quote: DirectQuote,
-  customPrice?: string
+  customPrice?: string,
+  slot?: { scheduledDate?: string; scheduledTime?: string }
 ): Promise<string> {
   const quoteRef = doc(db, "quotes", quote.id)
   await updateDoc(quoteRef, {
@@ -584,7 +595,8 @@ export async function acceptDirectQuote(
     providerName: quote.providerName,
     category: quote.serviceNeeded,
     price: customPrice || "Estimate on inspection",
-    scheduledDate: quote.preferredDate || new Date().toISOString().split("T")[0],
+    scheduledDate: slot?.scheduledDate || quote.preferredDate || new Date().toISOString().split("T")[0],
+    scheduledTime: slot?.scheduledTime || "10:00 AM - 12:00 PM",
     location: quote.serviceLocation,
     status: "confirmed",
     createdAt: serverTimestamp(),

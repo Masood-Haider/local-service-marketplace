@@ -25,6 +25,7 @@ import {
   listenToProviderDirectQuotes,
   acceptDirectQuote,
   declineDirectQuote,
+  updateBookingStatus,
   Job,
   Booking,
   DirectQuote,
@@ -49,6 +50,7 @@ import {
   Mail,
   Phone,
   Filter,
+  XCircle,
 } from "lucide-react"
 import { Link } from "react-router-dom"
 
@@ -71,8 +73,11 @@ export const ProviderDashboard: React.FC = () => {
   // Direct Quote accept dialog state
   const [selectedDirectQuote, setSelectedDirectQuote] = useState<DirectQuote | null>(null)
   const [acceptPrice, setAcceptPrice] = useState("")
+  const [acceptDate, setAcceptDate] = useState("")
+  const [acceptTime, setAcceptTime] = useState("10:00 AM - 12:00 PM")
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false)
   const [processingDirectQuote, setProcessingDirectQuote] = useState(false)
+  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null)
 
   // Load provider profile
   useEffect(() => {
@@ -164,16 +169,50 @@ export const ProviderDashboard: React.FC = () => {
   const handleOpenAcceptDirectDialog = (quote: DirectQuote) => {
     setSelectedDirectQuote(quote)
     setAcceptPrice(profile?.priceRange ? profile.priceRange.split("-")[0].trim() : "$100")
+    setAcceptDate(quote.preferredDate || new Date().toISOString().split("T")[0])
+    setAcceptTime("10:00 AM - 12:00 PM")
     setAcceptDialogOpen(true)
   }
 
   const handleConfirmAcceptDirectQuote = async () => {
     if (!selectedDirectQuote) return
     setProcessingDirectQuote(true)
+    const quoteToAccept = selectedDirectQuote
+    const finalPrice = acceptPrice.trim() || profile?.priceRange?.split("-")[0]?.trim() || "$100"
+    const finalDate = acceptDate || quoteToAccept.preferredDate || new Date().toISOString().split("T")[0]
+    const finalTime = acceptTime || "10:00 AM - 12:00 PM"
+
     try {
-      await acceptDirectQuote(selectedDirectQuote, acceptPrice.trim() || undefined)
+      const newBookingId = await acceptDirectQuote(quoteToAccept, finalPrice, {
+        scheduledDate: finalDate,
+        scheduledTime: finalTime,
+      })
+
+      // Immediately remove from pending direct quotes in UI
+      setDirectQuotes((prev) => prev.filter((q) => q.id !== quoteToAccept.id))
+
+      // Optimistically insert into scheduled bookings list so it immediately appears
+      const optimisticBooking: Booking = {
+        id: newBookingId,
+        jobId: quoteToAccept.id,
+        jobTitle: quoteToAccept.serviceNeeded,
+        customerId: quoteToAccept.customerId || "",
+        customerName: quoteToAccept.customerName,
+        customerEmail: quoteToAccept.customerEmail || "",
+        providerId: quoteToAccept.providerId,
+        providerName: quoteToAccept.providerName || profile?.name || currentUser?.name || "Provider",
+        category: quoteToAccept.serviceNeeded,
+        price: finalPrice,
+        scheduledDate: finalDate,
+        scheduledTime: finalTime,
+        location: quoteToAccept.serviceLocation,
+        status: "confirmed",
+        createdAt: new Date(),
+      }
+      setBookings((prev) => [optimisticBooking, ...prev.filter((b) => b.id !== newBookingId)])
+
       toast.success("Client Offer Accepted & Booked!", {
-        description: `Appointment confirmed for ${selectedDirectQuote.customerName}.`,
+        description: `Appointment confirmed for ${quoteToAccept.customerName} on ${finalDate}.`,
       })
       setAcceptDialogOpen(false)
       setSelectedDirectQuote(null)
@@ -185,10 +224,38 @@ export const ProviderDashboard: React.FC = () => {
     }
   }
 
+  const handleCancelBooking = async (bookingId: string, clientName: string) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to cancel the scheduled booking for ${clientName}? Both you and the client will be notified.`
+      )
+    ) {
+      return
+    }
+
+    setCancellingBookingId(bookingId)
+    try {
+      await updateBookingStatus(bookingId, "cancelled")
+      setBookings((prev) =>
+        prev.map((b) => (b.id === bookingId ? { ...b, status: "cancelled" } : b))
+      )
+      toast.success("Booking cancelled", {
+        description: `Scheduled appointment for ${clientName} has been cancelled.`,
+      })
+    } catch (err: any) {
+      console.error("Error cancelling booking:", err)
+      toast.error("Failed to cancel booking", { description: err.message || "Operation failed." })
+    } finally {
+      setCancellingBookingId(null)
+    }
+  }
+
   const handleDeclineDirectQuote = async (quote: DirectQuote) => {
     if (!window.confirm(`Decline quote request from ${quote.customerName}?`)) return
     try {
       await declineDirectQuote(quote.id, quote.customerId, profile?.name || currentUser?.name)
+      // Immediately remove from pending direct quotes in UI
+      setDirectQuotes((prev) => prev.filter((q) => q.id !== quote.id))
       toast.success("Request declined")
     } catch (err: any) {
       console.error("Error declining quote:", err)
@@ -499,29 +566,29 @@ export const ProviderDashboard: React.FC = () => {
         )
       })()}
 
-      {/* Scheduled Appointments & Confirmed Jobs Section */}
-      {bookings.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h3 className="text-xl font-bold text-foreground">Scheduled Appointments & Booked Jobs</h3>
-              <Badge variant="outline" className="text-xs font-semibold">
-                {bookings.length} Scheduled
-              </Badge>
-            </div>
-            <Link to="/dashboard/provider/schedule">
-              <Button variant="ghost" size="sm" className="text-xs gap-1">
-                View Full Schedule <ArrowRight className="w-3.5 h-3.5" />
-              </Button>
-            </Link>
+      {/* Scheduled Appointments & Booked Jobs Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xl font-bold text-foreground">Scheduled Appointments & Booked Jobs</h3>
+            <Badge variant="outline" className="text-xs font-semibold">
+              {bookings.filter((b) => b.status !== "cancelled").length} Active
+            </Badge>
           </div>
+          <Link to="/dashboard/provider/schedule">
+            <Button variant="ghost" size="sm" className="text-xs gap-1">
+              View Full Schedule <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          </Link>
+        </div>
 
+        {bookings.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {bookings.slice(0, 4).map((booking) => {
+            {bookings.slice(0, 6).map((booking) => {
               const statusInfo = getBookingStatusBadge(booking.status)
 
               return (
-                <Card key={booking.id} className="border-border hover:shadow-xs transition-shadow">
+                <Card key={booking.id} className="border-border hover:shadow-xs transition-shadow flex flex-col justify-between">
                   <CardHeader className="pb-2 flex flex-row items-start justify-between gap-2">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
@@ -533,9 +600,15 @@ export const ProviderDashboard: React.FC = () => {
                       <CardTitle className="text-base font-bold line-clamp-1">{booking.jobTitle}</CardTitle>
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                      <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-semibold gap-1">
-                        <Calendar className="w-3 h-3" /> Scheduled
-                      </Badge>
+                      {booking.status !== "cancelled" ? (
+                        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-semibold gap-1">
+                          <Calendar className="w-3 h-3" /> Scheduled
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-destructive border-destructive/30 bg-destructive/10 text-[10px] font-semibold gap-1">
+                          <XCircle className="w-3 h-3" /> Cancelled
+                        </Badge>
+                      )}
                       <Badge className={statusInfo.className}>
                         {statusInfo.label}
                       </Badge>
@@ -552,12 +625,48 @@ export const ProviderDashboard: React.FC = () => {
                       <MapPin className="w-3 h-3 text-primary shrink-0" /> {booking.location}
                     </p>
                   </CardContent>
+                  <CardFooter className="border-t border-border/60 pt-3 flex items-center justify-between bg-muted/10">
+                    <span className="text-[11px] text-muted-foreground">
+                      Status: <span className="font-semibold capitalize text-foreground">{booking.status.replace("_", " ")}</span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {booking.status !== "cancelled" && booking.status !== "completed" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs text-destructive hover:bg-destructive/10 border-destructive/30 h-7 px-2.5 gap-1"
+                          onClick={() => handleCancelBooking(booking.id, booking.customerName)}
+                          disabled={cancellingBookingId === booking.id}
+                        >
+                          {cancellingBookingId === booking.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <XCircle className="w-3.5 h-3.5" />
+                          )}
+                          Cancel Booking
+                        </Button>
+                      )}
+                    </div>
+                  </CardFooter>
                 </Card>
               )
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          <EmptyState
+            icon={Calendar}
+            title="No Scheduled Appointments Yet"
+            description="When you accept client offers or customers confirm your bids, your scheduled bookings will appear here."
+            action={
+              <Link to="/dashboard/provider/schedule">
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <Calendar className="w-4 h-4 text-primary" /> Open Service Calendar
+                </Button>
+              </Link>
+            }
+          />
+        )}
+      </div>
 
       {/* Real-time Open Jobs Section */}
       <div className="space-y-4">
@@ -764,6 +873,37 @@ export const ProviderDashboard: React.FC = () => {
               <p className="text-[11px] text-muted-foreground">
                 This confirmed rate will be recorded on the official client appointment.
               </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                  Scheduled Date *
+                </label>
+                <Input
+                  type="date"
+                  value={acceptDate}
+                  onChange={(e) => setAcceptDate(e.target.value)}
+                  min={new Date().toISOString().split("T")[0]}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                  Arrival Time Window *
+                </label>
+                <select
+                  value={acceptTime}
+                  onChange={(e) => setAcceptTime(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="08:00 AM - 10:00 AM" className="bg-popover text-popover-foreground">08:00 AM - 10:00 AM</option>
+                  <option value="10:00 AM - 12:00 PM" className="bg-popover text-popover-foreground">10:00 AM - 12:00 PM</option>
+                  <option value="12:00 PM - 02:00 PM" className="bg-popover text-popover-foreground">12:00 PM - 02:00 PM</option>
+                  <option value="02:00 PM - 04:00 PM" className="bg-popover text-popover-foreground">02:00 PM - 04:00 PM</option>
+                  <option value="04:00 PM - 06:00 PM" className="bg-popover text-popover-foreground">04:00 PM - 06:00 PM</option>
+                </select>
+              </div>
             </div>
           </div>
 

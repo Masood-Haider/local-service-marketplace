@@ -9,6 +9,7 @@ import {
   acceptJobQuoteWithSlot,
   declineJobQuote,
   deleteCustomerJob,
+  updateBookingStatus,
   getBookingStatusBadge,
   Job,
   JobQuote,
@@ -167,6 +168,34 @@ export const CustomerDashboard: React.FC = () => {
       toast.error("Failed to delete request", { description: err.message })
     } finally {
       setDeletingJobId(null)
+    }
+  }
+
+  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null)
+
+  const handleCancelBooking = async (bookingId: string, proName: string) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to cancel your scheduled appointment with ${proName}? Both you and the professional will be notified.`
+      )
+    ) {
+      return
+    }
+
+    setCancellingBookingId(bookingId)
+    try {
+      await updateBookingStatus(bookingId, "cancelled")
+      setBookings((prev) =>
+        prev.map((b) => (b.id === bookingId ? { ...b, status: "cancelled" } : b))
+      )
+      toast.success("Appointment cancelled", {
+        description: `Your appointment with ${proName} has been cancelled.`,
+      })
+    } catch (err: any) {
+      console.error("Error cancelling booking:", err)
+      toast.error("Failed to cancel appointment", { description: err.message || "Operation failed." })
+    } finally {
+      setCancellingBookingId(null)
     }
   }
 
@@ -402,7 +431,7 @@ export const CustomerDashboard: React.FC = () => {
               const statusInfo = getBookingStatusBadge(booking.status)
 
               return (
-                <Card key={booking.id} className="border-border hover:shadow-xs transition-shadow">
+                <Card key={booking.id} className="border-border hover:shadow-xs transition-shadow flex flex-col justify-between">
                   <CardHeader className="pb-2 flex flex-row items-start justify-between gap-2">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
@@ -414,9 +443,15 @@ export const CustomerDashboard: React.FC = () => {
                       <CardTitle className="text-base font-bold line-clamp-1">{booking.jobTitle}</CardTitle>
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                      <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-semibold gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> Accepted Offer
-                      </Badge>
+                      {booking.status !== "cancelled" ? (
+                        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-semibold gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Accepted Offer
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-destructive border-destructive/30 bg-destructive/10 text-[10px] font-semibold gap-1">
+                          <XCircle className="w-3 h-3" /> Cancelled
+                        </Badge>
+                      )}
                       <Badge className={statusInfo.className}>
                         {statusInfo.label}
                       </Badge>
@@ -440,6 +475,29 @@ export const CustomerDashboard: React.FC = () => {
                       </Link>
                     </div>
                   </CardContent>
+                  <CardFooter className="border-t border-border/60 pt-3 flex items-center justify-between bg-muted/10">
+                    <span className="text-[11px] text-muted-foreground">
+                      Status: <span className="font-semibold capitalize text-foreground">{booking.status.replace("_", " ")}</span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {booking.status !== "cancelled" && booking.status !== "completed" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs text-destructive hover:bg-destructive/10 border-destructive/30 h-7 px-2.5 gap-1"
+                          onClick={() => handleCancelBooking(booking.id, booking.providerName)}
+                          disabled={cancellingBookingId === booking.id}
+                        >
+                          {cancellingBookingId === booking.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <XCircle className="w-3.5 h-3.5" />
+                          )}
+                          Cancel Appointment
+                        </Button>
+                      )}
+                    </div>
+                  </CardFooter>
                 </Card>
               )
             })}
